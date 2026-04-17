@@ -257,7 +257,6 @@
                 terminal.scrollTop = terminal.scrollHeight;
             }
 
-            // ▼ 追加: エラーが発生した単語の位置を計算して '^' マーカーを出力する関数 ▼
             function showInvalidMarker(rawVal, args, errorIndex) {
                 const safeErrorIndex = Math.min(errorIndex, args.length - 1);
                 const errorWord = args[safeErrorIndex] || '';
@@ -590,7 +589,6 @@
                 window.parent.postMessage({ type: 'SSH_CHECK', targetIp: targetIp, user: user, sourceDeviceName: deviceState.hostname }, '*');
             }
 
-            // ▼ コマンドの処理（rawVal を引数に追加） ▼
             function processUserModeCommand(mainCommand, args, rawVal) {
                 if (mainCommand.startsWith('en')) { deviceState.mode = 'privileged'; updatePrompt(); return; }
                 if (mainCommand === 'exit') {
@@ -631,11 +629,13 @@
                 if (mainCommand.startsWith('conf')) { deviceState.mode = 'config'; deviceState.configStack.push('privileged'); appendToTerminal('Enter configuration commands, one per line.  End with CNTL/Z.'); }
                 else if (mainCommand === 'exit') deviceState.mode = 'user';
                 else if (mainCommand === 'clear') {
-                    if (args.length >= 4 && args[1] === 'ip' && args[2] === 'ospf' && (args[3] === 'process' || args[3] === 'proc')) {
-                        deviceState.awaitingInput = 'ospf_clear';
-                    } else {
-                        showInvalidMarker(rawVal, args, 1);
-                    }
+                    if (args.length < 2) { appendToTerminal('% Incomplete command.'); }
+                    else if (args[1] !== 'ip') { showInvalidMarker(rawVal, args, 1); }
+                    else if (args.length < 3) { appendToTerminal('% Incomplete command.'); }
+                    else if (args[2] !== 'ospf') { showInvalidMarker(rawVal, args, 2); }
+                    else if (args.length < 4) { appendToTerminal('% Incomplete command.'); }
+                    else if (args[3] !== 'process' && args[3] !== 'proc') { showInvalidMarker(rawVal, args, 3); }
+                    else { deviceState.awaitingInput = 'ospf_clear'; }
                 }
                 else if (mainCommand === 'copy') {
                     if (args.length >= 3) {
@@ -739,18 +739,15 @@
                     if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
                     deviceState.runningConfig.routing.ospf[processId].routerId = args[1];
                 } else if (mainCommand === 'network') {
-                    if (args.length < 5 || args[3].toLowerCase() !== 'area') { appendToTerminal('% Incomplete command.'); return; }
+                    if (args.length < 5 || args[3].toLowerCase() !== 'area') { showInvalidMarker(rawVal, args, args.length < 5 ? 3 : 3); return; }
                     if (!deviceState.runningConfig.routing.ospf[processId].networks) {
                         deviceState.runningConfig.routing.ospf[processId].networks = [];
                     }
-                    
                     const exists = deviceState.runningConfig.routing.ospf[processId].networks.some(
                         n => n.ip === args[1] && n.wildcard === args[2] && n.area === args[4]
                     );
                     if (!exists) {
-                        deviceState.runningConfig.routing.ospf[processId].networks.push({
-                            ip: args[1], wildcard: args[2], area: args[4]
-                        });
+                        deviceState.runningConfig.routing.ospf[processId].networks.push({ ip: args[1], wildcard: args[2], area: args[4] });
                     }
                 } else if (mainCommand === 'exit') {
                     deviceState.mode = deviceState.configStack.pop() || 'config';
@@ -787,13 +784,13 @@
                             if (args.length < 3) { appendToTerminal('% Incomplete command.'); break; }
                             const targets = parseInterfaceRange(args.slice(2).join(' '));
                             const invalidPorts = targets.filter(t => physicalPortRegex.test(t) && !deviceState.runningConfig.interfaces[t]);
-                            if (invalidPorts.length > 0) { appendToTerminal('% Invalid interface type and number'); break; }
+                            if (invalidPorts.length > 0) { showInvalidMarker(rawVal, args, 2); break; }
                             targets.forEach(n => { if(!deviceState.runningConfig.interfaces[n]) deviceState.runningConfig.interfaces[n] = {}; });
                             deviceState.mode = 'interface-range'; deviceState.configStack.push('config'); deviceState.currentInterfaceRange = targets;
                         } else {
                             const name = normalizeInterfaceName(args.slice(1).join(' '));
                             if (physicalPortRegex.test(name)) {
-                                if (!deviceState.runningConfig.interfaces[name]) { appendToTerminal('% Invalid interface type and number'); break; }
+                                if (!deviceState.runningConfig.interfaces[name]) { showInvalidMarker(rawVal, args, 1); break; }
                             } else {
                                 if(!deviceState.runningConfig.interfaces[name]) deviceState.runningConfig.interfaces[name] = {};
                             }
@@ -812,7 +809,7 @@
                             deviceState.runningConfig.security.users[args[1]] = { privilege: parseInt(args[3]), password: args[5], algorithm: 'md5' };
                         } else if (args.length >= 6 && arg2 === 'privilege' && arg4 === 'password') {
                             deviceState.runningConfig.security.users[args[1]] = { privilege: parseInt(args[3]), password: args[5], algorithm: 'clear' };
-                        } else { appendToTerminal('% Incomplete command.'); }
+                        } else { showInvalidMarker(rawVal, args, 1); }
                         break;
                     }
                     case 'vlan':
@@ -826,27 +823,31 @@
                          if (args[1] === 'run') {
                              if (!deviceState.runningConfig.cdp) deviceState.runningConfig.cdp = { enabled: true, interfaces: {} };
                              deviceState.runningConfig.cdp.enabled = true;
-                         } else appendToTerminal('% Incomplete command.');
+                         } else showInvalidMarker(rawVal, args, 1);
                          break;
                     case 'lldp':
                          if (args[1] === 'run') {
                              if (!deviceState.runningConfig.lldp) deviceState.runningConfig.lldp = { enabled: false, interfaces: {} };
                              deviceState.runningConfig.lldp.enabled = true;
-                         } else appendToTerminal('% Incomplete command.');
+                         } else showInvalidMarker(rawVal, args, 1);
                          break;
                     case 'no': 
                          if (args[1] === 'cdp') {
-                             if (!deviceState.runningConfig.cdp) deviceState.runningConfig.cdp = { enabled: true, interfaces: {} };
-                             deviceState.runningConfig.cdp.enabled = false;
+                             if (args[2] === 'run') {
+                                if (!deviceState.runningConfig.cdp) deviceState.runningConfig.cdp = { enabled: true, interfaces: {} };
+                                deviceState.runningConfig.cdp.enabled = false;
+                             } else showInvalidMarker(rawVal, args, 2);
                          }
-                         else if (args[1] === 'lldp' && args[2] === 'run') {
-                             if (!deviceState.runningConfig.lldp) deviceState.runningConfig.lldp = { enabled: false, interfaces: {} };
-                             deviceState.runningConfig.lldp.enabled = false;
+                         else if (args[1] === 'lldp') {
+                             if (args[2] === 'run') {
+                                if (!deviceState.runningConfig.lldp) deviceState.runningConfig.lldp = { enabled: false, interfaces: {} };
+                                deviceState.runningConfig.lldp.enabled = false;
+                             } else showInvalidMarker(rawVal, args, 2);
                          }
                          else if (args[1] === 'logging' && args[2] === 'console') {
-                             // 問題8のTips対策
+                             // Tips対策
                          }
-                         else appendToTerminal('% Incomplete command.');
+                         else showInvalidMarker(rawVal, args, 1);
                          break;
                     case 'ip':
                         if (args.length < 2) { appendToTerminal('% Incomplete command.'); break; }
@@ -862,7 +863,7 @@
                             if (args[2] === 'version') {
                                 if (args.length < 4) { appendToTerminal('% Incomplete command.'); break; }
                                 deviceState.runningConfig.security.sshVersion = parseInt(args[3]);
-                            } else { appendToTerminal('% Incomplete command.'); }
+                            } else { showInvalidMarker(rawVal, args, 2); }
                         } else if (args[1] === 'access-list') {
                             if (args.length < 4) { appendToTerminal('% Incomplete command.'); break; }
                             const name = args[3];
@@ -882,7 +883,7 @@
                             deviceState.mode = 'line'; deviceState.configStack.push('config'); deviceState.currentLine = 'vty 0 4';
                             if (!deviceState.runningConfig.lines['vty 0 4']) deviceState.runningConfig.lines['vty 0 4'] = { transport: { input: [] } };
                             updatePrompt();
-                        } else { appendToTerminal('% Incomplete command.'); }
+                        } else { showInvalidMarker(rawVal, args, 1); }
                         break;
                     case 'ntp': 
                         if (args[1] === 'server') { 
@@ -901,8 +902,6 @@
                 if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); return; }
                 if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); return; }
 
-                let commandFound = false; let incomplete = false;
-
                 for (const name of targets) {
                     const conf = deviceState.runningConfig.interfaces[name];
                     if (!conf) continue;
@@ -911,85 +910,88 @@
                     switch (mainCommand) {
                         case 'shutdown': 
                         case 'shut':
-                            conf.status = 'shutdown'; commandFound = true; break;
+                            conf.status = 'shutdown'; break;
                         case 'no':
-                            if (args.length < 2) { incomplete = true; break; }
+                            if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
                             if (args[1] === 'shutdown' || args[1] === 'shut') {
                                 conf.status = 'up'; 
-                                commandFound = true;
                             }
                             else if (args[1] === 'cdp') {
-                                if (deviceState.runningConfig.cdp && deviceState.runningConfig.cdp.interfaces) deviceState.runningConfig.cdp.interfaces[name] = false;
-                                commandFound = true;
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
+                                if (args[2] === 'enable') {
+                                    if (deviceState.runningConfig.cdp && deviceState.runningConfig.cdp.interfaces) deviceState.runningConfig.cdp.interfaces[name] = false;
+                                } else { showInvalidMarker(rawVal, args, 2); return; }
                             }
                             else if (args[1] === 'lldp') {
-                                if (args.length < 3) { incomplete = true; break; }
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
                                 if (args[2] === 'transmit' || args[2] === 'receive') {
                                     if (!deviceState.runningConfig.lldp) deviceState.runningConfig.lldp = { enabled: false, interfaces: {} };
                                     if (!deviceState.runningConfig.lldp.interfaces) deviceState.runningConfig.lldp.interfaces = {};
                                     if (!deviceState.runningConfig.lldp.interfaces[name]) deviceState.runningConfig.lldp.interfaces[name] = { transmit: true, receive: true };
-
                                     if (args[2] === 'transmit') deviceState.runningConfig.lldp.interfaces[name].transmit = false;
                                     else if (args[2] === 'receive') deviceState.runningConfig.lldp.interfaces[name].receive = false;
-                                    commandFound = true;
-                                }
-                            }
+                                } else { showInvalidMarker(rawVal, args, 2); return; }
+                            } else { showInvalidMarker(rawVal, args, 1); return; }
                             break;
                         case 'channel-group':
-                            if (args.length < 4 || args[2] !== 'mode') { incomplete = true; break; }
+                            if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                            if (args[2] !== 'mode') { showInvalidMarker(rawVal, args, 2); return; }
+                            if (!['active', 'passive', 'on'].includes(args[3])) { showInvalidMarker(rawVal, args, 3); return; }
                             if (!conf.channelGroup) conf.channelGroup = {};
                             conf.channelGroup.id = args[1];
                             conf.channelGroup.mode = args[3];
-                            commandFound = true; break;
+                            break;
                         case 'switchport':
-                            if (args.length < 2) { incomplete = true; break; }
+                            if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
                             if (args[1] === 'mode') {
-                                if (args.length < 3) { incomplete = true; break; }
-                                conf.switchport.mode = args[2];
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
+                                if (['access', 'trunk', 'dynamic'].includes(args[2])) { conf.switchport.mode = args[2]; }
+                                else { showInvalidMarker(rawVal, args, 2); return; }
                             } else if (args[1] === 'access') {
-                                if (args.length < 4 || args[2] !== 'vlan') { incomplete = true; break; } 
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
+                                if (args[2] !== 'vlan') { showInvalidMarker(rawVal, args, 2); return; } 
+                                if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
                                 conf.switchport.access_vlan = args[3];
                             } else if (args[1] === 'voice') {
-                                if (args.length < 4 || args[2] !== 'vlan') { incomplete = true; break; } 
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
+                                if (args[2] !== 'vlan') { showInvalidMarker(rawVal, args, 2); return; } 
+                                if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
                                 conf.switchport.voice_vlan = args[3];
                             } else if (args[1] === 'trunk') {
-                                if (args.length < 3) { incomplete = true; break; }
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
                                 if (args[2] === 'encapsulation') {
-                                    if (args.length < 4) { incomplete = true; break; }
-                                    conf.switchport.encapsulation = args[3];
+                                    if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                                    if (['dot1q', 'isl'].includes(args[3])) { conf.switchport.encapsulation = args[3]; }
+                                    else { showInvalidMarker(rawVal, args, 3); return; }
                                 } else if (args[2] === 'allowed') {
-                                    let vlansStr = '';
-                                    if (args[3] === 'vlan' && args[4]) {
-                                        vlansStr = args[4];
-                                    } else if (args[3] && args[3] !== 'vlan') {
-                                        vlansStr = args[3];
-                                    }
-                                    if (vlansStr) {
-                                        conf.switchport.allowed_vlans = vlansStr.split(',');
-                                    } else {
-                                        incomplete = true; break;
-                                    }
+                                    if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                                    let vlansStr = (args[3] === 'vlan' && args[4]) ? args[4] : (args[3] !== 'vlan' ? args[3] : '');
+                                    if (vlansStr) { conf.switchport.allowed_vlans = vlansStr.split(','); }
+                                    else { appendToTerminal('% Incomplete command.'); return; }
                                 } else if (args[2] === 'native') {
-                                    if (args.length < 5 || args[3] !== 'vlan') { incomplete = true; break; }
+                                    if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                                    if (args[3] !== 'vlan') { showInvalidMarker(rawVal, args, 3); return; }
+                                    if (args.length < 5) { appendToTerminal('% Incomplete command.'); return; }
                                     conf.switchport.native_vlan = args[4];
-                                }
+                                } else { showInvalidMarker(rawVal, args, 2); return; }
                             } else if (args[1] === 'port-security') {
                                 if (!conf.portSecurity) conf.portSecurity = {};
-                                if (args.length === 2) conf.portSecurity.enabled = true;
-                                else if (args[2] === 'maximum') conf.portSecurity.maximum = parseInt(args[3]);
-                                else if (args[2] === 'violation') conf.portSecurity.violation = args[3];
-                                else if (args[2] === 'mac-address') conf.portSecurity.stickyMac = true;
-                            }
-                            commandFound = true; break;
+                                if (args.length === 2) { conf.portSecurity.enabled = true; }
+                                else if (args[2] === 'maximum') { conf.portSecurity.maximum = parseInt(args[3]); }
+                                else if (args[2] === 'violation') { conf.portSecurity.violation = args[3]; }
+                                else if (args[2] === 'mac-address') { conf.portSecurity.stickyMac = true; }
+                                else { showInvalidMarker(rawVal, args, 2); return; }
+                            } else { showInvalidMarker(rawVal, args, 1); return; }
+                            break;
                         case 'cdp': 
-                             if (args.length < 2) { incomplete = true; break; }
+                             if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
                              if (args[1] === 'enable') {
                                  if (!deviceState.runningConfig.cdp) deviceState.runningConfig.cdp = { enabled: true, interfaces: {} };
                                  deviceState.runningConfig.cdp.interfaces[name] = true; 
-                             }
-                             commandFound = true; break;
+                             } else { showInvalidMarker(rawVal, args, 1); return; }
+                             break;
                         case 'lldp': 
-                             if (args.length < 2) { incomplete = true; break; } 
+                             if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; } 
                              if (args[1] === 'transmit' || args[1] === 'receive') {
                                  if (!deviceState.runningConfig.lldp) deviceState.runningConfig.lldp = { enabled: false, interfaces: {} };
                                  if (!deviceState.runningConfig.lldp.interfaces) deviceState.runningConfig.lldp.interfaces = {};
@@ -997,42 +999,41 @@
 
                                  if (args[1] === 'transmit') deviceState.runningConfig.lldp.interfaces[name].transmit = true;
                                  else if (args[1] === 'receive') deviceState.runningConfig.lldp.interfaces[name].receive = true;
-                                 commandFound = true;
-                             }
+                             } else { showInvalidMarker(rawVal, args, 1); return; }
                              break;
                         case 'ip':
-                            if (args.length < 2) { incomplete = true; break; }
+                            if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
                             if (args[1] === 'address' || args[1] === 'add') {
-                                if (args.length < 4) { incomplete = true; break; }
+                                if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
                                 conf.ip = args[2]; conf.mask = args[3];
                             }
-                            else if (args[1] === 'access-group') { if (args.length < 4) { incomplete = true; break; } if (!conf.accessGroup) conf.accessGroup = {}; conf.accessGroup[args[3]] = args[2]; }
-                            else if (args[1] === 'helper-address') { if (args.length < 3) { incomplete = true; break; } conf.ipHelper = args[2]; }
+                            else if (args[1] === 'access-group') { if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; } if (!conf.accessGroup) conf.accessGroup = {}; conf.accessGroup[args[3]] = args[2]; }
+                            else if (args[1] === 'helper-address') { if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; } conf.ipHelper = args[2]; }
                             else if (args[1] === 'ospf') {
-                                if (args.length < 3) { incomplete = true; break; }
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
                                 if (args[2] === 'priority') {
-                                    if (args.length < 4) { incomplete = true; break; }
+                                    if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
                                     if (!conf.ospf) conf.ospf = {};
                                     conf.ospf.priority = parseInt(args[3]);
                                 } else {
-                                    if (args.length < 5 || args[3].toLowerCase() !== 'area') { incomplete = true; break; }
+                                    if (args.length < 5) { appendToTerminal('% Incomplete command.'); return; }
+                                    if (args[3].toLowerCase() !== 'area') { showInvalidMarker(rawVal, args, 3); return; }
                                     if (!conf.ospf) conf.ospf = {};
                                     conf.ospf.processId = args[2];
                                     conf.ospf.area = args[4];
                                 }
-                            }
-                            commandFound = true; break;
+                            } else { showInvalidMarker(rawVal, args, 1); return; }
+                            break;
                         case 'ipv6':
-                            if (args.length < 2) { incomplete = true; break; }
+                            if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
                             if (args[1] === 'address' || args[1] === 'add') {
-                                if (args.length < 3) { incomplete = true; break; }
+                                if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
                                 conf.ipv6 = args[2];
-                            }
-                            commandFound = true; break;
-                        default: break;
+                            } else { showInvalidMarker(rawVal, args, 1); return; }
+                            break;
+                        default: showInvalidMarker(rawVal, args, 0); return;
                     }
                 }
-                if (incomplete) appendToTerminal('% Incomplete command.'); else if (!commandFound) showInvalidMarker(rawVal, args, 0);
             }
 
             function processVlanModeCommand(mainCommand, args, rawVal) {
