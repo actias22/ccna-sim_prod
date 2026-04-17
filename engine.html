@@ -372,7 +372,6 @@
 
             const physicalPortRegex = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet)/;
 
-            // ▼ 更新: remote-span などを追加 ▼
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'exit'],
                 'privileged': ['auto', 'clear', 'clock', 'configure', 'connect', 'copy', 'debug', 'delete', 'dir', 'disable', 'disconnect', 'enable', 'erase', 'exit', 'logout', 'mkdir', 'more', 'no', 'ping', 'reload', 'resume', 'rmdir', 'send', 'setup', 'show', 'ssh', 'telnet', 'terminal', 'traceroute', 'undebug', 'vlan', 'write'],
@@ -389,7 +388,6 @@
                 const lastWord = words[words.length - 1] !== undefined ? words[words.length - 1] : '';
                 let candidates = [];
 
-                // ▼ 追加: 'no' コマンドに続く引数候補の統合 ▼
                 if (words.length === 2 && words[0] === 'no') {
                     if (mode === 'config') {
                         candidates = ['aaa', 'access-list', 'banner', 'bba-group', 'boot', 'cdp', 'class-map', 'clock', 'crypto', 'enable', 'flow', 'hostname', 'interface', 'ip', 'key', 'lldp', 'logging', 'login', 'mac', 'mls', 'monitor', 'ntp', 'parameter-map', 'parser', 'policy-map', 'port-channel', 'priority-list', 'privilege', 'queue-list', 'router', 'sdm', 'service', 'snmp-server', 'spanning-tree', 'tacacs-server', 'username', 'vlan', 'vtp'];
@@ -409,19 +407,20 @@
                 } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
                     candidates = ['receive', 'transmit', 'run'];
                 }
-                // ▲ ここまでnoの追加 ▲
-
                 else if (words.length === 2 && words[0].startsWith('conf')) {
                     candidates = ['terminal'];
                 } else if (words.length === 2 && words[0] === 'lldp') {
                     candidates = ['transmit', 'receive', 'run'];
-                } else if (words.length === 2 && words[0] === 'clear') {
-                    candidates = ['ip'];
+                } 
+                // ▼ 追加: clear コマンドの候補拡張 ▼
+                else if (words.length === 2 && words[0] === 'clear') {
+                    candidates = ['aaa', 'access-list', 'arp-cache', 'cdp', 'frame-relay', 'ip', 'ipv6', 'line', 'mac-address-table', 'vtp'];
                 } else if (words.length === 3 && words[0] === 'clear' && words[1] === 'ip') {
-                    candidates = ['ospf'];
+                    candidates = ['bgp', 'dhcp', 'nat', 'ospf', 'route'];
                 } else if (words.length === 4 && words[0] === 'clear' && words[1] === 'ip' && words[2] === 'ospf') {
                     candidates = ['process'];
-                } else if (words.length === 2 && words[0] === 'router') {
+                } 
+                else if (words.length === 2 && words[0] === 'router') {
                     candidates = ['ospf', 'rip', 'eigrp'];
                 } else if (words.length === 2 && (words[0] === 'show' || words[0] === 'sh')) {
                     candidates = ['ip', 'running-config', 'vlan', 'mac-address-table'];
@@ -436,13 +435,18 @@
                 } else if (words.length === 3 && (words[0] === 'interface' || words[0] === 'int') && words[1] === 'range') {
                     candidates = ['Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
                 } 
+                // ▼ 更新: ip ospf の引数候補をさらに拡張 ▼
                 else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
                     candidates = ['access-group', 'access-list', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'route', 'split-horizon', 'ssh', 'summary-address', 'virtual-reassembly'];
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
                     candidates = ['extended', 'standard'];
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'ospf') {
-                    candidates = ['authentication', 'authentication-key', 'cost', 'dead-interval', 'hello-interval', 'message-digest-key', 'network', 'priority'];
-                } 
+                    candidates = ['<1-65535>', 'authentication', 'authentication-key', 'cost', 'dead-interval', 'hello-interval', 'message-digest-key', 'network', 'priority'];
+                } else if (words.length === 4 && words[0] === 'ip' && words[1] === 'ospf' && !isNaN(words[2])) {
+                    candidates = ['area'];
+                } else if (words.length === 5 && words[0] === 'ip' && words[1] === 'ospf' && !isNaN(words[2]) && words[3] === 'area') {
+                    candidates = ['<0-4294967295>', 'A.B.C.D'];
+                }
                 else if (words.length === 4 && words[0] === 'network') {
                     candidates = ['area'];
                 }
@@ -491,6 +495,9 @@
                 const words = currentInput.split(' ');
                 
                 let candidates = getCandidates(words, deviceState.mode);
+                
+                // '<'から始まるプレースホルダー等はTabで補完しないように除外
+                candidates = candidates.filter(c => !c.startsWith('<') && c !== 'A.B.C.D');
 
                 if (candidates.length === 1) {
                     words[words.length - 1] = candidates[0];
