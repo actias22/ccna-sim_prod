@@ -217,13 +217,11 @@
                 }
             };
 
-            // ▼ 変更: スイッチ用とルーター用の状態を個別に記憶するオブジェクトを作成 ▼
             const persistentStates = {
                 'switch': JSON.parse(JSON.stringify(initialSwitchState)),
                 'router': JSON.parse(JSON.stringify(initialRouterState))
             };
 
-            // 現在選択されているデバイスの状態を参照
             let deviceState = persistentStates[deviceType];
 
             function appendToTerminal(text) {
@@ -243,7 +241,6 @@
             }
 
             function clearTerminal() { 
-                // 画面上のDOM要素だけを削除（deviceState.screenLog は消さない）
                 const lines = terminal.querySelectorAll('.log-line');
                 lines.forEach(line => terminal.removeChild(line));
             }
@@ -258,7 +255,6 @@
                         terminal.insertBefore(div, currentInputLine);
                     });
                 } else {
-                    // 初期状態の場合のみ初期メッセージを出力
                     appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                     appendToTerminal('Press ENTER to continue...');
                 }
@@ -327,14 +323,12 @@
                 promptSpan.textContent = prompt;
             }
 
-            // ▼ 変更: タブ切り替え時に状態をリセットせず、保存済みの状態を読み込むように修正 ▼
             function switchToDeviceMode(mode) {
-                if (deviceType === mode) return; // 既に同じモードなら何もしない
+                if (deviceType === mode) return; 
 
                 deviceType = mode;
-                deviceState = persistentStates[deviceType]; // 保存されている状態に切り替え
+                deviceState = persistentStates[deviceType]; 
 
-                // 履歴もデバイスごとのものを復元
                 commandHistory = deviceState.commandHistory || [];
                 historyIndex = commandHistory.length;
 
@@ -346,7 +340,7 @@
                 
                 if (!isInitialized) initializeEngine();
                 else {
-                    renderTerminal(); // 復元されたログを描画
+                    renderTerminal(); 
                     updatePrompt();
                     commandInput.value = '';
                     syncInputDisplay();
@@ -355,7 +349,6 @@
             }
             
             function onResetConfirmed() {
-                // リセットは「現在開いているデバイス」のみ初期化する
                 persistentStates[deviceType] = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
                 deviceState = persistentStates[deviceType];
                 
@@ -457,6 +450,18 @@
                 else if (words.length === 2 && words[0].startsWith('conf')) {
                     candidates = ['terminal'];
                 } 
+                // ▼ 追加: copy コマンドの候補拡張 ▼
+                else if (words.length === 2 && words[0] === 'copy') {
+                    candidates = ['flash:', 'ftp:', 'running-config', 'scp:', 'startup-config', 'tftp:'];
+                } else if (words.length === 3 && words[0] === 'copy') {
+                    const validMedia = ['flash:', 'ftp:', 'running-config', 'scp:', 'startup-config', 'tftp:'];
+                    const srcMatch = validMedia.find(m => m.startsWith(words[1].toLowerCase()));
+                    if (srcMatch) {
+                        // コピー元で指定したものは、コピー先の候補から除外する（実機仕様）
+                        candidates = validMedia.filter(m => m !== srcMatch);
+                    }
+                }
+                // ▲ ここまで copy の追加 ▲
                 else if (words.length === 2 && words[0] === 'lldp') {
                     if (mode === 'config') candidates = ['run'];
                     else if (mode.startsWith('interface')) candidates = ['receive', 'transmit'];
@@ -655,14 +660,32 @@
                     else if (args[3] !== 'process' && args[3] !== 'proc') { showInvalidMarker(rawVal, args, 3); }
                     else { deviceState.awaitingInput = 'ospf_clear'; }
                 }
+                // ▼ 追加: copy コマンドの厳格なエラー判定処理 ▼
                 else if (mainCommand === 'copy') {
-                    if (args.length >= 3) {
-                         const src = args[1]; const dst = args[2];
-                         if ((src === 'run' || src === 'running-config') && (dst === 'start' || dst === 'startup-config')) {
-                            deviceState.awaitingInput = 'copy_run_start';
-                         } else { showInvalidMarker(rawVal, args, 1); }
-                     } else { appendToTerminal('% Incomplete command.'); }
+                    const validMedia = ['flash:', 'ftp:', 'running-config', 'scp:', 'startup-config', 'tftp:'];
+                    if (args.length < 2) {
+                        appendToTerminal('% Incomplete command.');
+                    } else {
+                        const srcMatch = validMedia.find(m => m.startsWith(args[1].toLowerCase()));
+                        if (!srcMatch) {
+                            showInvalidMarker(rawVal, args, 1);
+                        } else if (args.length < 3) {
+                            appendToTerminal('% Incomplete command.');
+                        } else {
+                            const dstMatch = validMedia.find(m => m.startsWith(args[2].toLowerCase()));
+                            if (!dstMatch) {
+                                showInvalidMarker(rawVal, args, 2);
+                            } else {
+                                if (srcMatch === 'running-config' && dstMatch === 'startup-config') {
+                                    deviceState.awaitingInput = 'copy_run_start';
+                                } else {
+                                    appendToTerminal('% Function not fully simulated.');
+                                }
+                            }
+                        }
+                    }
                 }
+                // ▲ ここまで copy の追加 ▲
                 else if (mainCommand === 'write' || mainCommand === 'wr') {
                     appendToTerminal('Building configuration...'); appendToTerminal('[OK]');
                     deviceState.runningConfig.startupConfig = JSON.parse(JSON.stringify(deviceState.runningConfig));
