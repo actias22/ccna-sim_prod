@@ -9,7 +9,7 @@
             height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden; /* 画面全体のスクロールを禁止 */
+            overflow: hidden; 
         }
         body { 
             font-family: 'Courier New', monospace; 
@@ -37,7 +37,7 @@
             overflow: hidden; 
             min-height: 0; 
             position: relative;
-            cursor: text; /* ターミナル全体をテキストカーソルに */
+            cursor: text; 
         }
         
         #terminal { 
@@ -50,14 +50,12 @@
             word-break: break-all;
         }
 
-        /* ログの各行 */
         .log-line {
             white-space: pre-wrap;
             line-height: 1.2;
             margin-bottom: 2px;
         }
 
-        /* プロンプトと同居する現在入力中の行 */
         #current-input-line {
             display: flex;
             align-items: flex-end;
@@ -73,27 +71,28 @@
             white-space: pre; 
         }
 
-        #input-display {
+        /* ▼ 修正: カーソルより前と後の文字を分ける */
+        #input-before, #input-after {
             color: #33ff33;
             font-family: 'Courier New', monospace;
             white-space: pre-wrap;
         }
 
-        /* 実機風の点滅カーソル */
+        /* ▼ 修正: 実機風のブロックカーソル（文字の上に乗るタイプ） */
         #cursor {
             display: inline-block;
-            width: 8px;
-            height: 15px;
             background-color: #33ff33;
+            color: #000; /* カーソルの下の文字は黒く反転 */
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
             animation: blink 1s step-end infinite;
-            vertical-align: bottom;
         }
+
         @keyframes blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0; }
         }
 
-        /* 本物の入力枠は完全に隠す */
         #command-input { 
             opacity: 0; 
             position: absolute; 
@@ -113,7 +112,7 @@
     <div class="terminal-container">
         <div id="terminal">
             <div id="current-input-line">
-                <span id="prompt">Router&gt;</span><span id="input-display"></span><span id="cursor"></span>
+                <span id="prompt">Router&gt;</span><span id="input-before"></span><span id="cursor"></span><span id="input-after"></span>
             </div>
         </div>
         <input type="text" id="command-input" autofocus="" autocomplete="off" spellcheck="false">
@@ -124,21 +123,38 @@
             const terminal = document.getElementById('terminal');
             const promptSpan = document.getElementById('prompt');
             const commandInput = document.getElementById('command-input');
-            const inputDisplay = document.getElementById('input-display');
+            const inputBefore = document.getElementById('input-before');
+            const inputAfter = document.getElementById('input-after');
             const cursor = document.getElementById('cursor');
             const currentInputLine = document.getElementById('current-input-line');
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
 
-            // --- 入力と表示の同期 ---
+            // ▼ 修正: 実際のカーソル位置に合わせて文字を3分割して描画するロジック ▼
             function syncInputDisplay() {
-                inputDisplay.textContent = commandInput.value;
+                const val = commandInput.value;
+                const pos = commandInput.selectionStart || 0; // カーソルの現在位置
+                
+                inputBefore.textContent = val.substring(0, pos);
+                
+                // カーソルが文字の途中にあるか、末尾にあるかで描画を分岐
+                if (pos < val.length) {
+                    // 途中にある場合: カーソル要素にその文字を乗せ、残りをafterに入れる
+                    cursor.textContent = val.charAt(pos);
+                    inputAfter.textContent = val.substring(pos + 1);
+                } else {
+                    // 末尾にある場合: カーソル要素に空白(幅)を持たせ、afterは空にする
+                    cursor.textContent = '\u00A0'; // &nbsp;（改行しない空白）
+                    inputAfter.textContent = '';
+                }
+                
                 terminal.scrollTop = terminal.scrollHeight;
             }
 
-            // ターミナルのどこをクリックしても入力欄にフォーカス
+            // ターミナルのどこをクリックしても入力欄にフォーカス＆カーソル位置更新
             document.addEventListener('click', () => {
                 commandInput.focus();
+                setTimeout(syncInputDisplay, 0); // クリックによる位置移動を待ってから更新
             });
 
             commandInput.addEventListener('input', syncInputDisplay);
@@ -210,7 +226,6 @@
 
             let deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
 
-            // ★変更: 入力行(current-input-line)の「直前」にログを追加するように修正
             function appendToTerminal(text) {
                 if (!deviceState.screenLog) deviceState.screenLog = [];
                 deviceState.screenLog.push(text);
@@ -221,7 +236,6 @@
                 div.textContent = text;
                 terminal.insertBefore(div, currentInputLine);
                 
-                // 5000行を超えたら古いもの(一番上のlog-line)を消す
                 const lines = terminal.querySelectorAll('.log-line');
                 if (lines.length > 5000) {
                     terminal.removeChild(lines[0]);
@@ -230,7 +244,6 @@
 
             function clearTerminal() { 
                 if (deviceState) deviceState.screenLog = [];
-                // current-input-line 以外の要素(ログ)をすべて削除
                 const lines = terminal.querySelectorAll('.log-line');
                 lines.forEach(line => terminal.removeChild(line));
             }
@@ -1014,6 +1027,11 @@
             }
 
             commandInput.addEventListener('keydown', function (e) {
+                // ▼ 修正: 左右キーやHome/Endを押した際に、カーソル位置の描画をすぐに同期させる ▼
+                if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+                    setTimeout(syncInputDisplay, 0); // 実際のカーソル移動を待ってから同期
+                }
+                
                 if (e.key === 'Tab') { handleTabCompletion(e); return; }
                 if (e.key === '?') { handleQuestionMark(e); return; }
                 
