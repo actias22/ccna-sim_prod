@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シミュレーター 使い方ガイド</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: #004488;
+            color: #fff;
+            padding: 20px 0;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            background: #fff;
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #0066cc;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin-top: 40px;
+        }
+        h3 {
+            color: #333;
+            margin-top: 25px;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        .terminal-example {
+            background-color: #1a1a1a;
+            color: #33ff33;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            line-height: 1.4;
+        }
+        .terminal-example span.prompt {
+            font-weight: bold;
+        }
+        .terminal-example span.error-marker {
+            color: #33ff33;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+            color: #856404;
+        }
+        .key {
+            display: inline-block;
+            background-color: #eee;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-family: monospace;
+            font-size: 0.9em;
+            box-shadow: 0 2px 0 #ccc;
+            margin: 0 3px;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Cisco CCNA コマンドシミュレーター 使い方ガイド</h1>
+</div>
+
+<div class="container">
+    <p>本シミュレーターは、実際のCiscoルーターおよびスイッチのコマンド操作（CLI）をブラウザ上で極めてリアルに再現した学習ツールです。<br>このページでは、実機同様に使用できる便利なショートカット機能や、特有の操作方法について解説します。</p>
+
+    <h2>1. 便利な入力補助機能</h2>
+    <p>コマンドをすべて手打ちする必要はありません。実機と同じ入力補助機能が備わっています。</p>
+
+    <h3>◆ Tabキーによる自動補完</h3>
+    <p>コマンドの途中まで入力して <span class="key">Tab</span> キーを押すと、残りの文字が自動的に補完されます。入力ミスを防ぎ、素早く設定を行うために必須のテクニックです。</p>
+    <div class="terminal-example">
+        <span class="prompt">Router(config)#</span> int<br>
+        <span style="color:#888;">(ここで Tab キーを押すと...)</span><br>
+        <span class="prompt">Router(config)#</span> interface 
+    </div>
+
+    <h3>◆ 「?」キーによるコマンド候補の表示</h3>
+    <p>次に何のコマンドや引数を打てばよいか分からない場合、<span class="key">?</span> （クエスチョンマーク）を入力すると、そのモードや文脈で使用可能なコマンドの一覧が表示されます。</p>
+    <div class="terminal-example">
+        <span class="prompt">Switch(config-if)#</span> switchport ?<br>
+        &nbsp;&nbsp;access         Set access mode characteristics of the interface<br>
+        &nbsp;&nbsp;mode           Set trunking mode of the interface<br>
+        &nbsp;&nbsp;nonegotiate    Device will not engage in negotiation protocol...<br>
+        &nbsp;&nbsp;port-security  Security related command<br>
+        &nbsp;&nbsp;trunk          Set trunking characteristics of the interface<br>
+        &nbsp;&nbsp;voice          Voice appliance attributes
+    </div>
+
+    <h2>2. コマンドの省略とエラー指摘</h2>
+    
+    <h3>◆ コマンドの短縮入力</h3>
+    <p>Cisco機器では、他のコマンドと区別できる文字数まで入力していれば、省略形でもコマンドが実行されます。本シミュレーターでも完全に再現されています。</p>
+    <ul>
+        <li><code>configure terminal</code> ➔ <strong><code class="highlight">conf t</code></strong></li>
+        <li><code>interface Ethernet0/0</code> ➔ <strong><code class="highlight">int e0/0</code></strong></li>
+        <li><code>copy running-config startup-config</code> ➔ <strong><code class="highlight">copy run start</code></strong></li>
+    </ul>
+
+    <h3>◆ エラーマーカー（^）による位置指摘</h3>
+    <p>コマンドの綴りやオプションを間違えた場合、無効な単語のすぐ下に <code>^</code> マーカーが表示され、どこが間違っているかを正確に指摘してくれます。</p>
+    <div class="terminal-example">
+        <span class="prompt">Switch(config-if)#</span> switchport mode acces<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="error-marker">^</span><br>
+        % Invalid input detected at '^' marker.
+    </div>
+
+    <h2>3. ターミナル操作の小技</h2>
+    <ul>
+        <li><strong>履歴の呼び出し:</strong> <span class="key">↑</span>（上矢印）キーを押すと、過去に入力したコマンドを遡って呼び出すことができます。何度も同じコマンドを打つ際に便利です。</li>
+        <li><strong>カーソル移動:</strong> 入力済みの長いコマンドの一部だけを直したい場合、<span class="key">←</span> <span class="key">→</span> キーでカーソルを移動させて途中の文字を編集できます。</li>
+    </ul>
+
+    <h2>4. 【重要】設定の保存について</h2>
+    <p>課題（シナリオ）モードをプレイしている場合、設定変更後に<strong>「設定の保存」</strong>を行わないと、正解判定になりません。<br>実機において再起動後も設定を残すための重要な手順です。すべての設定が完了したら、特権EXECモード（<code>#</code>）に戻り、以下のいずれかのコマンドを必ず実行してください。</p>
+    <div class="terminal-example">
+        <span class="prompt">Router#</span> copy running-config startup-config<br>
+        Destination filename [startup-config]? <span style="color:#888;">(Enterを押す)</span><br>
+        Building configuration...<br>
+        [OK]
+    </div>
+    <p>※短縮形の <code>copy run start</code> や、古い表記である <code>write</code> (または <code>wr</code>) でも保存可能です。</p>
+
+</div>
+
+<div class="footer">
+    &copy; Cisco CCNA Command Simulator
+</div>
+
+</body>
+</html>
