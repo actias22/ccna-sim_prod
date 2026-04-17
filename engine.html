@@ -71,18 +71,16 @@
             white-space: pre; 
         }
 
-        /* ▼ 修正: カーソルより前と後の文字を分ける */
         #input-before, #input-after {
             color: #33ff33;
             font-family: 'Courier New', monospace;
             white-space: pre-wrap;
         }
 
-        /* ▼ 修正: 実機風のブロックカーソル（文字の上に乗るタイプ） */
         #cursor {
             display: inline-block;
             background-color: #33ff33;
-            color: #000; /* カーソルの下の文字は黒く反転 */
+            color: #000; 
             font-family: 'Courier New', monospace;
             white-space: pre-wrap;
             animation: blink 1s step-end infinite;
@@ -130,31 +128,26 @@
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
 
-            // ▼ 修正: 実際のカーソル位置に合わせて文字を3分割して描画するロジック ▼
             function syncInputDisplay() {
                 const val = commandInput.value;
-                const pos = commandInput.selectionStart || 0; // カーソルの現在位置
+                const pos = commandInput.selectionStart || 0; 
                 
                 inputBefore.textContent = val.substring(0, pos);
                 
-                // カーソルが文字の途中にあるか、末尾にあるかで描画を分岐
                 if (pos < val.length) {
-                    // 途中にある場合: カーソル要素にその文字を乗せ、残りをafterに入れる
                     cursor.textContent = val.charAt(pos);
                     inputAfter.textContent = val.substring(pos + 1);
                 } else {
-                    // 末尾にある場合: カーソル要素に空白(幅)を持たせ、afterは空にする
-                    cursor.textContent = '\u00A0'; // &nbsp;（改行しない空白）
+                    cursor.textContent = '\u00A0'; 
                     inputAfter.textContent = '';
                 }
                 
                 terminal.scrollTop = terminal.scrollHeight;
             }
 
-            // ターミナルのどこをクリックしても入力欄にフォーカス＆カーソル位置更新
             document.addEventListener('click', () => {
                 commandInput.focus();
-                setTimeout(syncInputDisplay, 0); // クリックによる位置移動を待ってから更新
+                setTimeout(syncInputDisplay, 0); 
             });
 
             commandInput.addEventListener('input', syncInputDisplay);
@@ -379,16 +372,17 @@
 
             const physicalPortRegex = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet)/;
 
+            // ▼ 追加・更新: ルーターの全コマンド群を辞書に登録 [cite: 1, 2, 3, 4, 5, 6, 7, 8] ▼
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'exit'],
-                'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase', 'clear'],
-                'config': ['hostname', 'interface', 'ip', 'ipv6', 'username', 'line', 'vlan', 'cdp', 'lldp', 'no', 'exit', 'end', 'ntp', 'router'],
-                'interface': ['ip', 'ipv6', 'shutdown', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
-                'interface-range': ['ip', 'ipv6', 'shutdown', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
+                'privileged': ['auto', 'clear', 'clock', 'configure', 'connect', 'copy', 'debug', 'delete', 'dir', 'disable', 'disconnect', 'enable', 'erase', 'exit', 'logout', 'mkdir', 'more', 'no', 'ping', 'reload', 'resume', 'rmdir', 'send', 'setup', 'show', 'ssh', 'telnet', 'terminal', 'traceroute', 'undebug', 'vlan', 'write'],
+                'config': ['aaa', 'access-list', 'banner', 'bba-group', 'boot', 'cdp', 'class-map', 'clock', 'config-register', 'crypto', 'default', 'do', 'dot11', 'enable', 'end', 'exit', 'flow', 'hostname', 'interface', 'ip', 'ipv6', 'key', 'line', 'lldp', 'logging', 'login', 'mac-address-table', 'no', 'ntp', 'parameter-map', 'parser', 'policy-map', 'port-channel', 'priority-list', 'privilege', 'queue-list', 'router', 'secure', 'security', 'service', 'snmp-server', 'spanning-tree', 'tacacs-server', 'username', 'vpdn', 'vpdn-group', 'vlan', 'zone', 'zone-pair'],
+                'interface': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mtu', 'no', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'speed', 'standby', 'switchport', 'tx-ring-limit', 'zone-member'],
+                'interface-range': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mtu', 'no', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'speed', 'standby', 'switchport', 'tx-ring-limit', 'zone-member'],
                 'vlan': ['name', 'exit', 'end', 'no'],
                 'line': ['transport', 'login', 'password', 'exit', 'end', 'no'],
                 'acl': ['permit', 'deny', 'remark', 'no', 'exit', 'end'],
-                'router': ['router-id', 'network', 'passive-interface', 'default-information', 'exit', 'end', 'no']
+                'router': ['area', 'auto-cost', 'default-information', 'distance', 'end', 'exit', 'log-adjacency-changes', 'neighbor', 'network', 'no', 'passive-interface', 'redistribute', 'router-id']
             };
 
             function getCandidates(words, mode) {
@@ -423,13 +417,20 @@
                     candidates = ['range', 'Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
                 } else if (words.length === 3 && (words[0] === 'interface' || words[0] === 'int') && words[1] === 'range') {
                     candidates = ['Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
-                } else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
-                    candidates = ['address', 'access-list', 'route', 'nat', 'ssh', 'dhcp', 'ospf', 'helper-address'];
+                } 
+                // ▼ 追加・更新: ルーターのIPおよびOSPFパラメータの引数を拡張 [cite: 12, 13] ▼
+                else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
+                    candidates = ['access-group', 'access-list', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'route', 'split-horizon', 'ssh', 'summary-address', 'virtual-reassembly'];
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
                     candidates = ['extended', 'standard'];
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'ospf') {
-                    candidates = ['priority'];
-                } else if (words.length === 2 && words[0] === 'transport') {
+                    candidates = ['authentication', 'authentication-key', 'cost', 'dead-interval', 'hello-interval', 'message-digest-key', 'network', 'priority'];
+                } 
+                // ▼ 追加・更新: Networkコマンドの引数候補 [cite: 9, 10] ▼
+                else if (words.length === 4 && words[0] === 'network') {
+                    candidates = ['area'];
+                }
+                else if (words.length === 2 && words[0] === 'transport') {
                     candidates = ['input'];
                 } else if (words.length === 3 && words[0] === 'transport' && words[1] === 'input') {
                     candidates = ['telnet', 'ssh', 'all', 'none'];
@@ -1027,9 +1028,8 @@
             }
 
             commandInput.addEventListener('keydown', function (e) {
-                // ▼ 修正: 左右キーやHome/Endを押した際に、カーソル位置の描画をすぐに同期させる ▼
                 if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
-                    setTimeout(syncInputDisplay, 0); // 実際のカーソル移動を待ってから同期
+                    setTimeout(syncInputDisplay, 0); 
                 }
                 
                 if (e.key === 'Tab') { handleTabCompletion(e); return; }
