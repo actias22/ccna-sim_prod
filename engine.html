@@ -43,20 +43,17 @@
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
 
-            // ▼新規追加：ターミナル内の変化を監視し、常に一番下へ自動スクロールさせる▼
             const observer = new MutationObserver(() => {
                 terminal.scrollTop = terminal.scrollHeight;
             });
             observer.observe(terminal, { childList: true, subtree: true });
 
-            // 入力中やフォーカス時にも確実に一番下へピタッと追従させる
             commandInput.addEventListener('input', () => {
                 terminal.scrollTop = terminal.scrollHeight;
             });
             commandInput.addEventListener('focus', () => {
                 terminal.scrollTop = terminal.scrollHeight;
             });
-            // ▲ここまで▲
 
             window.onerror = function (message, source, lineno, colno, error) {
                 console.error('エラー:', message, source, lineno); return true;
@@ -259,12 +256,13 @@
 
             const physicalPortRegex = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet)/;
 
+            // ★修正: 辞書から 'sh', 'int', 'shut' などの短縮形を削除し、実機と同様に正式名称のみを残しました。
             const commandVocabulary = {
-                'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'sh', 'exit'],
-                'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'sh', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase', 'clear'],
-                'config': ['hostname', 'interface', 'int', 'ip', 'ipv6', 'username', 'line', 'vlan', 'cdp', 'lldp', 'no', 'exit', 'end', 'ntp', 'router'],
-                'interface': ['ip', 'ipv6', 'shutdown', 'shut', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
-                'interface-range': ['ip', 'ipv6', 'shutdown', 'shut', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
+                'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'exit'],
+                'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase', 'clear'],
+                'config': ['hostname', 'interface', 'ip', 'ipv6', 'username', 'line', 'vlan', 'cdp', 'lldp', 'no', 'exit', 'end', 'ntp', 'router'],
+                'interface': ['ip', 'ipv6', 'shutdown', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
+                'interface-range': ['ip', 'ipv6', 'shutdown', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
                 'vlan': ['name', 'exit', 'end', 'no'],
                 'line': ['transport', 'login', 'password', 'exit', 'end', 'no'],
                 'acl': ['permit', 'deny', 'remark', 'no', 'exit', 'end'],
