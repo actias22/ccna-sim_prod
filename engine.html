@@ -217,7 +217,14 @@
                 }
             };
 
-            let deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
+            // ▼ 変更: スイッチ用とルーター用の状態を個別に記憶するオブジェクトを作成 ▼
+            const persistentStates = {
+                'switch': JSON.parse(JSON.stringify(initialSwitchState)),
+                'router': JSON.parse(JSON.stringify(initialRouterState))
+            };
+
+            // 現在選択されているデバイスの状態を参照
+            let deviceState = persistentStates[deviceType];
 
             function appendToTerminal(text) {
                 if (!deviceState.screenLog) deviceState.screenLog = [];
@@ -236,7 +243,7 @@
             }
 
             function clearTerminal() { 
-                if (deviceState) deviceState.screenLog = [];
+                // 画面上のDOM要素だけを削除（deviceState.screenLog は消さない）
                 const lines = terminal.querySelectorAll('.log-line');
                 lines.forEach(line => terminal.removeChild(line));
             }
@@ -251,6 +258,7 @@
                         terminal.insertBefore(div, currentInputLine);
                     });
                 } else {
+                    // 初期状態の場合のみ初期メッセージを出力
                     appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                     appendToTerminal('Press ENTER to continue...');
                 }
@@ -319,35 +327,45 @@
                 promptSpan.textContent = prompt;
             }
 
+            // ▼ 変更: タブ切り替え時に状態をリセットせず、保存済みの状態を読み込むように修正 ▼
             function switchToDeviceMode(mode) {
+                if (deviceType === mode) return; // 既に同じモードなら何もしない
+
+                deviceType = mode;
+                deviceState = persistentStates[deviceType]; // 保存されている状態に切り替え
+
+                // 履歴もデバイスごとのものを復元
+                commandHistory = deviceState.commandHistory || [];
+                historyIndex = commandHistory.length;
+
                 if (mode === 'switch') {
-                    deviceType = 'switch'; 
-                    deviceState = JSON.parse(JSON.stringify(initialSwitchState));
                     switchModeBtn.classList.add('active'); routerModeBtn.classList.remove('active');
                 } else {
-                    deviceType = 'router'; 
-                    deviceState = JSON.parse(JSON.stringify(initialRouterState));
                     routerModeBtn.classList.add('active'); switchModeBtn.classList.remove('active');
                 }
                 
-                commandHistory = [];
-                historyIndex = 0;
-
                 if (!isInitialized) initializeEngine();
                 else {
-                    clearTerminal();
-                    renderTerminal();
+                    renderTerminal(); // 復元されたログを描画
                     updatePrompt();
+                    commandInput.value = '';
+                    syncInputDisplay();
+                    commandInput.focus();
                 }
             }
             
             function onResetConfirmed() {
-                deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
+                // リセットは「現在開いているデバイス」のみ初期化する
+                persistentStates[deviceType] = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
+                deviceState = persistentStates[deviceType];
+                
                 clearTerminal();
                 appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                 appendToTerminal('Press ENTER to continue...');
                 updatePrompt();
+                
                 commandHistory = [];
+                deviceState.commandHistory = [];
                 commandInput.value = '';
                 syncInputDisplay();
                 commandInput.focus();
