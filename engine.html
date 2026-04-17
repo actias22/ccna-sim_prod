@@ -5,16 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cisco CCNA コマンドシミュレーター</title>
     <style>
-        body { font-family: 'Courier New', monospace; background-color: #1a1a1a; color: #f0f0f0; margin: 0; padding: 20px; display: flex; flex-direction: column; height: auto; min-height: 100vh; overflow-y: auto; }
+        /* ▼ 修正: 画面全体のスクロールを禁止し、枠の中に押し込める */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        body { 
+            font-family: 'Courier New', monospace; 
+            background-color: #1a1a1a; 
+            color: #f0f0f0; 
+            box-sizing: border-box;
+            padding: 10px; 
+            display: flex; 
+            flex-direction: column; 
+        }
         h1 { color: #0066cc; margin-bottom: 20px; }
         .mode-selector { display: none; margin-bottom: 15px; }
         .powered-by { color: white; margin-top: -15px; margin-bottom: 15px; font-size: 14px; font-family: 'Courier New', monospace; }
         button { background-color: #0066cc; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; min-width: 120px; }
         button:hover { background-color: #0055aa; }
         button.active { background-color: #004488; font-weight: bold; }
-        .terminal-container { flex: 1; display: flex; flex-direction: column; border: 1px solid #333; border-radius: 5px; overflow: hidden; min-height: 400px; }
-        #terminal { flex: 1; background-color: #000; color: #33ff33; padding: 10px; overflow-y: auto; font-size: 14px; white-space: pre-wrap; }
-        .input-area { display: flex; background-color: #000; border-top: 1px solid #333; padding: 5px; visibility: hidden; }
+        
+        /* ▼ 修正: min-height:0 を追加し、枠が勝手に伸びないようにブロック */
+        .terminal-container { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            border: 1px solid #333; 
+            border-radius: 5px; 
+            overflow: hidden; 
+            min-height: 0; 
+        }
+        
+        /* ▼ 修正: min-height:0 で文字を枠内に収め、ここだけスクロールさせる */
+        #terminal { 
+            flex: 1; 
+            min-height: 0; 
+            background-color: #000; 
+            color: #33ff33; 
+            padding: 10px 10px 0 10px; /* 入力行との境目をなくすために下余白を0に */
+            overflow-y: auto; 
+            font-size: 14px; 
+            white-space: pre-wrap; 
+        }
+        
+        /* ▼ 修正: 線を消して上のログ画面と一体化させ、常に下部に固定 */
+        .input-area { 
+            display: flex; 
+            background-color: #000; 
+            padding: 0 10px 10px 5px; 
+            visibility: hidden; 
+        }
         #prompt { color: #33ff33; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre; }
         #command-input { flex: 1; background-color: #000; color: #33ff33; border: none; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; }
         #command-input:focus { outline: none; }
@@ -42,6 +85,11 @@
             const inputArea = document.querySelector('.input-area');
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
+
+            // ★追加: ターミナルの黒い部分をクリックしたら入力欄にフォーカスする
+            terminal.addEventListener('click', () => {
+                commandInput.focus();
+            });
 
             const observer = new MutationObserver(() => {
                 terminal.scrollTop = terminal.scrollHeight;
@@ -256,7 +304,6 @@
 
             const physicalPortRegex = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet)/;
 
-            // ★修正: 辞書から 'sh', 'int', 'shut' などの短縮形を削除し、実機と同様に正式名称のみを残しました。
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'exit'],
                 'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase', 'clear'],
