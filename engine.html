@@ -43,6 +43,21 @@
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
 
+            // ▼新規追加：ターミナル内の変化を監視し、常に一番下へ自動スクロールさせる▼
+            const observer = new MutationObserver(() => {
+                terminal.scrollTop = terminal.scrollHeight;
+            });
+            observer.observe(terminal, { childList: true, subtree: true });
+
+            // 入力中やフォーカス時にも確実に一番下へピタッと追従させる
+            commandInput.addEventListener('input', () => {
+                terminal.scrollTop = terminal.scrollHeight;
+            });
+            commandInput.addEventListener('focus', () => {
+                terminal.scrollTop = terminal.scrollHeight;
+            });
+            // ▲ここまで▲
+
             window.onerror = function (message, source, lineno, colno, error) {
                 console.error('エラー:', message, source, lineno); return true;
             };
@@ -108,7 +123,6 @@
                 div.textContent = text;
                 terminal.appendChild(div);
                 while (terminal.childNodes.length > 5000) terminal.removeChild(terminal.firstChild);
-                terminal.scrollTop = terminal.scrollHeight;
             }
 
             function renderTerminal() {
@@ -124,7 +138,6 @@
                     appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                     appendToTerminal('Press ENTER to continue...');
                 }
-                terminal.scrollTop = terminal.scrollHeight;
             }
 
             function clearTerminal() { 
@@ -258,9 +271,6 @@
                 'router': ['router-id', 'network', 'passive-interface', 'default-information', 'exit', 'end', 'no']
             };
 
-            // -------------------------------------------------------------
-            // ★追加: コマンドと引数の候補を賢く判定する関数
-            // -------------------------------------------------------------
             function getCandidates(words, mode) {
                 const lastWord = words[words.length - 1] !== undefined ? words[words.length - 1] : '';
                 let candidates = [];
@@ -330,9 +340,6 @@
                 return candidates.filter(cmd => cmd.startsWith(lastWord));
             }
 
-            // -------------------------------------------------------------
-            // ★修正: Tabキーによる補完ロジック (寸止め対応済み)
-            // -------------------------------------------------------------
             function handleTabCompletion(e) {
                 if (deviceState.awaitingInput) {
                     e.preventDefault();
@@ -349,7 +356,6 @@
                     words[words.length - 1] = candidates[0];
                     commandInput.value = words.join(' ') + ' ';
                 } else if (candidates.length > 1) {
-                    // 複数候補がある場合は、共通する文字までだけ補完する（Cisco実機仕様）
                     let commonPrefix = candidates[0];
                     for (let i = 1; i < candidates.length; i++) {
                         let j = 0;
@@ -366,30 +372,22 @@
                 }
             }
 
-            // -------------------------------------------------------------
-            // ★新規追加: ?キーによるヘルプ表示ロジック
-            // -------------------------------------------------------------
             function handleQuestionMark(e) {
-                if (deviceState.awaitingInput) return; // 対話入力中はヘルプを出さない
+                if (deviceState.awaitingInput) return;
                 
-                e.preventDefault(); // ?をinput欄に入力させない
+                e.preventDefault();
                 const currentInput = commandInput.value;
                 const words = currentInput.split(' ');
                 
                 const candidates = getCandidates(words, deviceState.mode);
                 
-                // 入力中のコマンド+? をターミナルに表示（実機挙動）
                 appendToTerminal(`${promptSpan.textContent}${currentInput}?`);
                 
                 if (candidates.length > 0) {
-                    // 候補を一覧表示
                     candidates.forEach(c => appendToTerminal(`  ${c}`));
                 } else {
                     appendToTerminal('% Unrecognized command');
                 }
-                
-                // ターミナルを一番下までスクロールさせる
-                terminal.scrollTop = terminal.scrollHeight;
             }
 
             function handleSshCommand(args) {
@@ -906,10 +904,9 @@
                 else if (deviceState.mode === 'line') processLineModeCommand(mainCommand, args);
             }
 
-            // ★追加: イベントリスナーに「?」の処理を統合
             commandInput.addEventListener('keydown', function (e) {
                 if (e.key === 'Tab') { handleTabCompletion(e); return; }
-                if (e.key === '?') { handleQuestionMark(e); return; } // ★ここを追加
+                if (e.key === '?') { handleQuestionMark(e); return; }
                 
                 if (e.key === 'ArrowUp') {
                     e.preventDefault();
