@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cisco CCNA コマンドシミュレーター</title>
     <style>
-        /* ▼ 修正: 画面全体のスクロールを禁止し、枠の中に押し込める */
         html, body {
             height: 100%;
             margin: 0;
@@ -28,7 +27,6 @@
         button:hover { background-color: #0055aa; }
         button.active { background-color: #004488; font-weight: bold; }
         
-        /* ▼ 修正: min-height:0 を追加し、枠が勝手に伸びないようにブロック */
         .terminal-container { 
             flex: 1; 
             display: flex; 
@@ -37,30 +35,72 @@
             border-radius: 5px; 
             overflow: hidden; 
             min-height: 0; 
+            cursor: text; /* ターミナル全体にテキストカーソルを表示 */
         }
         
-        /* ▼ 修正: min-height:0 で文字を枠内に収め、ここだけスクロールさせる */
         #terminal { 
             flex: 1; 
             min-height: 0; 
             background-color: #000; 
             color: #33ff33; 
-            padding: 10px 10px 0 10px; /* 入力行との境目をなくすために下余白を0に */
+            padding: 10px 10px 0 10px; 
             overflow-y: auto; 
             font-size: 14px; 
             white-space: pre-wrap; 
         }
         
-        /* ▼ 修正: 線を消して上のログ画面と一体化させ、常に下部に固定 */
+        /* ▼ 隠し入力フィールド方式のレイアウト ▼ */
         .input-area { 
             display: flex; 
+            align-items: center; /* 縦位置を揃える */
+            flex-wrap: wrap; /* 長いコマンドが打たれたら折り返す */
             background-color: #000; 
             padding: 0 10px 10px 5px; 
             visibility: hidden; 
+            position: relative;
         }
-        #prompt { color: #33ff33; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; white-space: pre; }
-        #command-input { flex: 1; background-color: #000; color: #33ff33; border: none; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; }
-        #command-input:focus { outline: none; }
+        
+        #prompt { 
+            color: #33ff33; 
+            padding: 5px 0 5px 5px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 14px; 
+            white-space: pre; 
+        }
+
+        /* ユーザーの目に見える文字表示エリア */
+        #input-display {
+            color: #33ff33;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* 実機風の点滅カーソル */
+        #cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background-color: #33ff33;
+            animation: blink 1s step-end infinite;
+            vertical-align: bottom;
+            margin-bottom: 2px;
+            margin-left: 1px;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 本物の入力枠は完全に隠す（フォーカスだけ受け取る） */
+        #command-input { 
+            opacity: 0; 
+            position: absolute; 
+            left: -9999px; 
+            width: 1px; 
+            height: 1px; 
+        }
     </style>
 </head>
 <body>
@@ -73,35 +113,51 @@
         <div id="terminal"></div>
         <div class="input-area">
             <span id="prompt">Router&gt;</span>
+            <span id="input-display"></span><span id="cursor"></span>
             <input type="text" id="command-input" autofocus="" autocomplete="off" spellcheck="false">
         </div>
     </div>
     
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            const terminalContainer = document.querySelector('.terminal-container');
             const terminal = document.getElementById('terminal');
             const promptSpan = document.getElementById('prompt');
             const commandInput = document.getElementById('command-input');
+            const inputDisplay = document.getElementById('input-display');
+            const cursor = document.getElementById('cursor');
             const inputArea = document.querySelector('.input-area');
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
 
-            // ★追加: ターミナルの黒い部分をクリックしたら入力欄にフォーカスする
-            terminal.addEventListener('click', () => {
+            // ▼ 実機風の入力同期・フォーカス処理 ▼
+            function syncInputDisplay() {
+                inputDisplay.textContent = commandInput.value;
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            // ターミナルのどこをクリックしても隠し入力枠にフォーカスさせる
+            document.addEventListener('click', () => {
                 commandInput.focus();
             });
 
+            // 文字が打たれるたびに表示を更新
+            commandInput.addEventListener('input', syncInputDisplay);
+            
+            // フォーカスが当たっている時だけカーソルを点滅させる
+            commandInput.addEventListener('focus', () => {
+                cursor.style.display = 'inline-block';
+            });
+            commandInput.addEventListener('blur', () => {
+                cursor.style.display = 'none';
+            });
+
+            // ターミナルの変化を監視し、常に一番下へ自動スクロール
             const observer = new MutationObserver(() => {
                 terminal.scrollTop = terminal.scrollHeight;
             });
             observer.observe(terminal, { childList: true, subtree: true });
-
-            commandInput.addEventListener('input', () => {
-                terminal.scrollTop = terminal.scrollHeight;
-            });
-            commandInput.addEventListener('focus', () => {
-                terminal.scrollTop = terminal.scrollHeight;
-            });
+            // ▲ ここまで ▲
 
             window.onerror = function (message, source, lineno, colno, error) {
                 console.error('エラー:', message, source, lineno); return true;
@@ -263,6 +319,8 @@
                 appendToTerminal('Press ENTER to continue...');
                 updatePrompt();
                 commandHistory = [];
+                commandInput.value = '';
+                syncInputDisplay();
                 commandInput.focus();
             }
 
@@ -400,6 +458,7 @@
                 if (candidates.length === 1) {
                     words[words.length - 1] = candidates[0];
                     commandInput.value = words.join(' ') + ' ';
+                    syncInputDisplay();
                 } else if (candidates.length > 1) {
                     let commonPrefix = candidates[0];
                     for (let i = 1; i < candidates.length; i++) {
@@ -413,6 +472,7 @@
                     if (commonPrefix.length > lastWord.length) {
                         words[words.length - 1] = commonPrefix;
                         commandInput.value = words.join(' ');
+                        syncInputDisplay();
                     }
                 }
             }
@@ -957,18 +1017,21 @@
                     e.preventDefault();
                     if (commandHistory.length > 0 && historyIndex > 0) { historyIndex--; commandInput.value = commandHistory[historyIndex]; } 
                     else if (historyIndex === -1 && commandHistory.length > 0) { historyIndex = commandHistory.length - 1; commandInput.value = commandHistory[historyIndex]; }
+                    syncInputDisplay();
                     return;
                 }
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     if (historyIndex < commandHistory.length - 1) { historyIndex++; commandInput.value = commandHistory[historyIndex]; } 
                     else { historyIndex = commandHistory.length; commandInput.value = ''; }
+                    syncInputDisplay();
                     return;
                 }
                 if (e.key === 'Enter') {
                     const rawVal = commandInput.value;
                     const val = rawVal.trim();
                     commandInput.value = '';
+                    syncInputDisplay();
                     
                     if (deviceState.awaitingInput) {
                         appendToTerminal(`${promptSpan.textContent}${rawVal}`);
