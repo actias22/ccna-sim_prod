@@ -372,14 +372,14 @@
 
             const physicalPortRegex = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet)/;
 
-            // ▼ ルーターとスイッチのコマンドを統合 ▼
+            // ▼ 更新: remote-span などを追加 ▼
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'exit'],
                 'privileged': ['auto', 'clear', 'clock', 'configure', 'connect', 'copy', 'debug', 'delete', 'dir', 'disable', 'disconnect', 'enable', 'erase', 'exit', 'logout', 'mkdir', 'more', 'no', 'ping', 'reload', 'resume', 'rmdir', 'send', 'setup', 'show', 'ssh', 'telnet', 'terminal', 'traceroute', 'undebug', 'vlan', 'write'],
                 'config': ['aaa', 'access-list', 'banner', 'bba-group', 'boot', 'cdp', 'class-map', 'clock', 'config-register', 'crypto', 'default', 'do', 'dot11', 'enable', 'end', 'exit', 'flow', 'hostname', 'interface', 'ip', 'ipv6', 'key', 'line', 'lldp', 'logging', 'login', 'mac', 'mac-address-table', 'mls', 'monitor', 'no', 'ntp', 'parameter-map', 'parser', 'policy-map', 'port-channel', 'priority-list', 'privilege', 'queue-list', 'router', 'sdm', 'secure', 'security', 'service', 'snmp-server', 'spanning-tree', 'tacacs-server', 'username', 'vlan', 'vpdn', 'vpdn-group', 'vtp', 'zone', 'zone-pair'],
                 'interface': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mdix', 'mls', 'mtu', 'no', 'power', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'spanning-tree', 'speed', 'standby', 'storm-control', 'switchport', 'tx-ring-limit', 'zone-member'],
                 'interface-range': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mdix', 'mls', 'mtu', 'no', 'power', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'spanning-tree', 'speed', 'standby', 'storm-control', 'switchport', 'tx-ring-limit', 'zone-member'],
-                'vlan': ['name', 'exit', 'end', 'no'],
+                'vlan': ['name', 'remote-span', 'exit', 'end', 'no'],
                 'line': ['transport', 'login', 'password', 'exit', 'end', 'no'],
                 'acl': ['permit', 'deny', 'remark', 'no', 'exit', 'end'],
                 'router': ['area', 'auto-cost', 'default-information', 'distance', 'end', 'exit', 'log-adjacency-changes', 'neighbor', 'network', 'no', 'passive-interface', 'redistribute', 'router-id']
@@ -389,14 +389,32 @@
                 const lastWord = words[words.length - 1] !== undefined ? words[words.length - 1] : '';
                 let candidates = [];
 
-                if (words.length === 2 && words[0].startsWith('conf')) {
+                // ▼ 追加: 'no' コマンドに続く引数候補の統合 ▼
+                if (words.length === 2 && words[0] === 'no') {
+                    if (mode === 'config') {
+                        candidates = ['aaa', 'access-list', 'banner', 'bba-group', 'boot', 'cdp', 'class-map', 'clock', 'crypto', 'enable', 'flow', 'hostname', 'interface', 'ip', 'key', 'lldp', 'logging', 'login', 'mac', 'mls', 'monitor', 'ntp', 'parameter-map', 'parser', 'policy-map', 'port-channel', 'priority-list', 'privilege', 'queue-list', 'router', 'sdm', 'service', 'snmp-server', 'spanning-tree', 'tacacs-server', 'username', 'vlan', 'vtp'];
+                    } else if (mode.startsWith('interface')) {
+                        candidates = ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'delay', 'description', 'duplex', 'hold-queue', 'ip', 'lldp', 'mdix', 'mls', 'power', 'service-policy', 'shutdown', 'spanning-tree', 'speed', 'storm-control', 'switchport', 'tx-ring-limit'];
+                    } else if (mode === 'vlan') {
+                        candidates = ['name', 'remote-span'];
+                    } else if (mode === 'line') {
+                        candidates = ['login', 'password', 'transport'];
+                    } else if (mode === 'router') {
+                        candidates = ['area', 'auto-cost', 'default-information', 'distance', 'log-adjacency-changes', 'neighbor', 'network', 'passive-interface', 'redistribute', 'router-id'];
+                    }
+                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'logging') {
+                    candidates = ['buffered', 'console', 'host', 'on', 'trap', 'userinfo'];
+                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'cdp') {
+                    candidates = ['enable', 'run'];
+                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
+                    candidates = ['receive', 'transmit', 'run'];
+                }
+                // ▲ ここまでnoの追加 ▲
+
+                else if (words.length === 2 && words[0].startsWith('conf')) {
                     candidates = ['terminal'];
                 } else if (words.length === 2 && words[0] === 'lldp') {
                     candidates = ['transmit', 'receive', 'run'];
-                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
-                    candidates = ['transmit', 'receive', 'run'];
-                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'logging') {
-                    candidates = ['console'];
                 } else if (words.length === 2 && words[0] === 'clear') {
                     candidates = ['ip'];
                 } else if (words.length === 3 && words[0] === 'clear' && words[1] === 'ip') {
@@ -433,7 +451,6 @@
                 } else if (words.length === 3 && words[0] === 'transport' && words[1] === 'input') {
                     candidates = ['telnet', 'ssh', 'all', 'none'];
                 } 
-                // ▼ スイッチポート・チャネル関連の引数を追加 ▼
                 else if (words.length === 2 && words[0] === 'switchport') {
                     candidates = ['access', 'mode', 'nonegotiate', 'port-security', 'priority', 'protected', 'trunk', 'voice'];
                 } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'mode') {
