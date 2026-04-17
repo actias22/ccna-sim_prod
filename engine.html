@@ -256,6 +256,26 @@
                 }
                 terminal.scrollTop = terminal.scrollHeight;
             }
+
+            // ▼ 追加: エラーが発生した単語の位置を計算して '^' マーカーを出力する関数 ▼
+            function showInvalidMarker(rawVal, args, errorIndex) {
+                const safeErrorIndex = Math.min(errorIndex, args.length - 1);
+                const errorWord = args[safeErrorIndex] || '';
+                
+                let index = 0;
+                for (let i = 0; i < safeErrorIndex; i++) {
+                    const wordIndex = rawVal.indexOf(args[i], index);
+                    if (wordIndex !== -1) {
+                        index = wordIndex + args[i].length;
+                    }
+                }
+                const targetIndex = rawVal.indexOf(errorWord, index);
+                const finalIndex = targetIndex !== -1 ? targetIndex : rawVal.length;
+                
+                const promptLength = promptSpan.textContent.length;
+                appendToTerminal(' '.repeat(promptLength + finalIndex) + '^');
+                appendToTerminal('% Invalid input detected at \'^\' marker.');
+            }
             
             function initializeEngine() {
                 if (isInitialized) return;
@@ -403,7 +423,6 @@
                 } else if (words.length === 3 && words[0] === 'no' && words[1] === 'logging') {
                     candidates = ['buffered', 'console', 'host', 'on', 'trap', 'userinfo'];
                 } 
-                // ▼ 修正: no cdp / no lldp もモードで厳密に分ける ▼
                 else if (words.length === 3 && words[0] === 'no' && words[1] === 'cdp') {
                     if (mode === 'config') candidates = ['run'];
                     else if (mode.startsWith('interface')) candidates = ['enable'];
@@ -411,7 +430,6 @@
                     if (mode === 'config') candidates = ['run'];
                     else if (mode.startsWith('interface')) candidates = ['receive', 'transmit'];
                 } 
-                // ▼ 修正: no ip / no ipv6 もモードで分ける ▼
                 else if (words.length === 3 && words[0] === 'no' && (words[1] === 'ip' || words[1] === 'ipv6')) {
                     if (mode === 'config') {
                         candidates = ['access-list', 'dhcp', 'domain-lookup', 'name-server', 'nat', 'route', 'ssh'];
@@ -422,7 +440,6 @@
                 else if (words.length === 2 && words[0].startsWith('conf')) {
                     candidates = ['terminal'];
                 } 
-                // ▼ 修正: cdp / lldp もモードで厳密に分ける ▼
                 else if (words.length === 2 && words[0] === 'lldp') {
                     if (mode === 'config') candidates = ['run'];
                     else if (mode.startsWith('interface')) candidates = ['receive', 'transmit'];
@@ -452,7 +469,6 @@
                 } else if (words.length === 3 && (words[0] === 'interface' || words[0] === 'int') && words[1] === 'range') {
                     candidates = ['Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
                 } 
-                // ▼ 修正: ip / ipv6 コマンドもモードで分ける ▼
                 else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
                     if (mode === 'config') {
                         candidates = ['access-list', 'dhcp', 'domain-lookup', 'name-server', 'nat', 'route', 'ssh'];
@@ -574,7 +590,8 @@
                 window.parent.postMessage({ type: 'SSH_CHECK', targetIp: targetIp, user: user, sourceDeviceName: deviceState.hostname }, '*');
             }
 
-            function processUserModeCommand(mainCommand, args) {
+            // ▼ コマンドの処理（rawVal を引数に追加） ▼
+            function processUserModeCommand(mainCommand, args, rawVal) {
                 if (mainCommand.startsWith('en')) { deviceState.mode = 'privileged'; updatePrompt(); return; }
                 if (mainCommand === 'exit') {
                      if (deviceState.isSshSession) { window.parent.postMessage({ type: 'SSH_EXIT' }, '*'); return; }
@@ -606,18 +623,18 @@
                     appendToTerminal('% Function not fully simulated in user mode.');
                 }
                 else if (mainCommand === 'ssh') handleSshCommand(args);
-                else appendToTerminal('% Invalid input detected at \'^\'');
+                else showInvalidMarker(rawVal, args, 0);
                 updatePrompt();
             }
 
-            function processPrivilegedModeCommand(mainCommand, args) {
+            function processPrivilegedModeCommand(mainCommand, args, rawVal) {
                 if (mainCommand.startsWith('conf')) { deviceState.mode = 'config'; deviceState.configStack.push('privileged'); appendToTerminal('Enter configuration commands, one per line.  End with CNTL/Z.'); }
                 else if (mainCommand === 'exit') deviceState.mode = 'user';
                 else if (mainCommand === 'clear') {
                     if (args.length >= 4 && args[1] === 'ip' && args[2] === 'ospf' && (args[3] === 'process' || args[3] === 'proc')) {
                         deviceState.awaitingInput = 'ospf_clear';
                     } else {
-                        appendToTerminal('% Invalid input detected at \'^\'');
+                        showInvalidMarker(rawVal, args, 1);
                     }
                 }
                 else if (mainCommand === 'copy') {
@@ -625,7 +642,7 @@
                          const src = args[1]; const dst = args[2];
                          if ((src === 'run' || src === 'running-config') && (dst === 'start' || dst === 'startup-config')) {
                             deviceState.awaitingInput = 'copy_run_start';
-                         } else { appendToTerminal('% Invalid input detected at \'^\''); }
+                         } else { showInvalidMarker(rawVal, args, 1); }
                      } else { appendToTerminal('% Incomplete command.'); }
                 }
                 else if (mainCommand === 'write' || mainCommand === 'wr') {
@@ -681,10 +698,10 @@
                                 appendToTerminal('icmp 209.165.200.225:1234 192.168.1.10:1234 10.200.220.6:1234  10.200.220.6:1234');
                             }
                         } else {
-                            appendToTerminal('% Invalid input detected at \'^\'');
+                            showInvalidMarker(rawVal, args, 3);
                         }
                     } 
-                    else { appendToTerminal('% Invalid input detected at \'^\''); }
+                    else { showInvalidMarker(rawVal, args, 1); }
                 }
                 else if (mainCommand === 'ping' || mainCommand === 'traceroute') {
                     if (args.length < 2) { appendToTerminal('% Incomplete command.'); }
@@ -710,11 +727,11 @@
                     }
                 }
                 else if (mainCommand === 'ssh') handleSshCommand(args);
-                else appendToTerminal('% Invalid input detected at \'^\'');
+                else showInvalidMarker(rawVal, args, 0);
                 updatePrompt();
             }
 
-            function processRouterModeCommand(mainCommand, args) {
+            function processRouterModeCommand(mainCommand, args, rawVal) {
                 const processId = deviceState.currentRouterProcess;
                 if (!deviceState.runningConfig.routing.ospf[processId]) deviceState.runningConfig.routing.ospf[processId] = { networks: [] };
                 
@@ -741,11 +758,11 @@
                 } else if (mainCommand === 'end') {
                     deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt();
                 } else {
-                    appendToTerminal('% Invalid input detected at \'^\'');
+                    showInvalidMarker(rawVal, args, 0);
                 }
             }
 
-            function processConfigModeCommand(mainCommand, args) {
+            function processConfigModeCommand(mainCommand, args, rawVal) {
                 switch (mainCommand) {
                     case 'hostname': 
                         if(args[1]) { deviceState.hostname = args[1]; deviceState.runningConfig.hostname = args[1]; updatePrompt(); }
@@ -762,7 +779,7 @@
                             if (!deviceState.runningConfig.routing.ospf) deviceState.runningConfig.routing.ospf = {};
                             if (!deviceState.runningConfig.routing.ospf[processId]) deviceState.runningConfig.routing.ospf[processId] = { networks: [] };
                             updatePrompt();
-                        } else { appendToTerminal('% Invalid input detected at \'^\''); }
+                        } else { showInvalidMarker(rawVal, args, 1); }
                         break;
                     case 'int': case 'interface':
                         if (args.length < 2) { appendToTerminal('% Incomplete command.'); break; }
@@ -858,7 +875,7 @@
                              else if (args[3] === 'vlan') {
                                  args[4].split(',').forEach(id => { if (!deviceState.runningConfig.dhcpSnooping.vlans.includes(id)) deviceState.runningConfig.dhcpSnooping.vlans.push(id); });
                              } else if (args[3] === 'verify' && args[4] === 'mac-address') deviceState.runningConfig.dhcpSnooping.verifyMac = true;
-                        } else { appendToTerminal('% Invalid input detected at \'^\''); }
+                        } else { showInvalidMarker(rawVal, args, 1); }
                         break;
                     case 'line':
                         if (args[1] === 'vty') {
@@ -871,15 +888,15 @@
                         if (args[1] === 'server') { 
                             if(args.length < 3) { appendToTerminal('% Incomplete command.'); break; }
                             if (!deviceState.runningConfig.ntp) deviceState.runningConfig.ntp = {}; deviceState.runningConfig.ntp.server = args[2]; 
-                        } else { appendToTerminal('% Invalid input detected at \'^\''); }
+                        } else { showInvalidMarker(rawVal, args, 1); }
                         break;
                     case 'exit': deviceState.mode = deviceState.configStack.pop() || 'privileged'; updatePrompt(); break;
                     case 'end': deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); break;
-                    default: appendToTerminal('% Invalid input detected at \'^\'');
+                    default: showInvalidMarker(rawVal, args, 0);
                 }
             }
 
-            function processInterfaceModeCommand(mainCommand, args) {
+            function processInterfaceModeCommand(mainCommand, args, rawVal) {
                 let targets = deviceState.mode === 'interface-range' ? deviceState.currentInterfaceRange : [deviceState.currentInterface];
                 if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); return; }
                 if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); return; }
@@ -1015,20 +1032,20 @@
                         default: break;
                     }
                 }
-                if (incomplete) appendToTerminal('% Incomplete command.'); else if (!commandFound) appendToTerminal('% Invalid input detected at \'^\'');
+                if (incomplete) appendToTerminal('% Incomplete command.'); else if (!commandFound) showInvalidMarker(rawVal, args, 0);
             }
 
-            function processVlanModeCommand(mainCommand, args) {
+            function processVlanModeCommand(mainCommand, args, rawVal) {
                 if (mainCommand === 'name') {
                     if (args.length < 2) appendToTerminal('% Incomplete command.');
                     else deviceState.runningConfig.vlans[deviceState.currentVlan].name = args.slice(1).join(' ');
                 }
                 else if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); }
                 else if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); return; }
-                else appendToTerminal('% Invalid input detected at \'^\'');
+                else showInvalidMarker(rawVal, args, 0);
             }
 
-            function processAclModeCommand(mainCommand, args) {
+            function processAclModeCommand(mainCommand, args, rawVal) {
                 const acl = deviceState.runningConfig.acls[deviceState.currentAcl];
                 if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); return; }
                 if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); return; }
@@ -1041,37 +1058,37 @@
                     const entry = { action: mainCommand, raw: normalizedArgs.join(' '), sequenceNumber: acl.entries.length + 10 };
                     acl.entries.push(entry);
                 } else if (mainCommand === 'no') { if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; } } 
-                else { appendToTerminal('% Invalid input detected at \'^\''); }
+                else { showInvalidMarker(rawVal, args, 0); }
             }
 
-            function processLineModeCommand(mainCommand, args) {
+            function processLineModeCommand(mainCommand, args, rawVal) {
                 if (mainCommand === 'transport') {
                     if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
-                    if (args[1] !== 'input') { appendToTerminal('% Invalid input detected at \'^\''); return; }
+                    if (args[1] !== 'input') { showInvalidMarker(rawVal, args, 1); return; }
                     deviceState.runningConfig.lines['vty 0 4'].transport.input = args.slice(2);
                 }
                 else if (mainCommand === 'login') {
                     if (args[1] === 'local') deviceState.runningConfig.lines['vty 0 4'].loginMethod = 'local';
-                    else appendToTerminal('% Invalid input detected at \'^\'');
+                    else showInvalidMarker(rawVal, args, 1);
                 }
                 else if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); }
                 else if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); }
-                else appendToTerminal('% Invalid input detected at \'^\'');
+                else showInvalidMarker(rawVal, args, 0);
             }
 
-            function processCommand(command) {
-                if (!command) return;
-                const args = command.trim().split(/\s+/);
+            function processCommand(val, rawVal) {
+                if (!val) return;
+                const args = val.split(/\s+/);
                 const mainCommand = args[0].toLowerCase();
                 
-                if (deviceState.mode === 'user') processUserModeCommand(mainCommand, args);
-                else if (deviceState.mode === 'privileged') processPrivilegedModeCommand(mainCommand, args);
-                else if (deviceState.mode === 'config') processConfigModeCommand(mainCommand, args);
-                else if (deviceState.mode === 'router') processRouterModeCommand(mainCommand, args);
-                else if (deviceState.mode.startsWith('interface')) processInterfaceModeCommand(mainCommand, args);
-                else if (deviceState.mode === 'vlan') processVlanModeCommand(mainCommand, args);
-                else if (deviceState.mode === 'acl') processAclModeCommand(mainCommand, args);
-                else if (deviceState.mode === 'line') processLineModeCommand(mainCommand, args);
+                if (deviceState.mode === 'user') processUserModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode === 'privileged') processPrivilegedModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode === 'config') processConfigModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode === 'router') processRouterModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode.startsWith('interface')) processInterfaceModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode === 'vlan') processVlanModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode === 'acl') processAclModeCommand(mainCommand, args, rawVal);
+                else if (deviceState.mode === 'line') processLineModeCommand(mainCommand, args, rawVal);
             }
 
             commandInput.addEventListener('keydown', function (e) {
@@ -1125,15 +1142,14 @@
                             return; 
                         }
                     } else {
-                        appendToTerminal(`${promptSpan.textContent}${val}`);
+                        appendToTerminal(`${promptSpan.textContent}${rawVal}`);
+                        if (val) { 
+                            commandHistory.push(val); 
+                            historyIndex = commandHistory.length; 
+                            deviceState.commandHistory = [...commandHistory]; 
+                            processCommand(val, rawVal);
+                        }
                     }
-                    
-                    if (val) { 
-                        commandHistory.push(val); 
-                        historyIndex = commandHistory.length; 
-                        deviceState.commandHistory = [...commandHistory]; 
-                    }
-                    processCommand(val);
                 }
             });
 
