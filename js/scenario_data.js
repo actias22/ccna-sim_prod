@@ -319,7 +319,7 @@ Sw1,Sw2(config-if-range)#channel-group 12 mode active`
   },
 
 // -------------------------------------------------------------
-  // 【新】問題⑥: Voice VLAN と LLDP
+  // 【新】問題6: Voice VLAN と LLDP
   // -------------------------------------------------------------
   {
     id: "new_q6",
@@ -385,7 +385,7 @@ Sw1,Sw2(config-if)# lldp receive`
   },
 
   // -------------------------------------------------------------
-  // 【新】問題⑦: エンドデバイスへの接続とネイバーディスカバリ
+  // 【新】問題7: エンドデバイスへの接続とネイバーディスカバリ
   // -------------------------------------------------------------
   {
     id: "new_q7",
@@ -446,7 +446,7 @@ SW-1(config-if)#no cdp enable`
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.access_vlan", expected: "30", message: "SW-2: E0/1 の access vlan が 30 に設定されていません" },
       { device: "SW-2", path: "runningConfig.lldp.enabled", expected: true, message: "SW-2: LLDPがグローバルで有効になっていません" },
       { device: "SW-2", path: "runningConfig.lldp.interfaces.Ethernet0/0.transmit", expected: true, message: "SW-2: E0/0 で lldp transmit が設定されていません" },
-      { device: "SW-2", path: "runningConfig.lldp.interfaces.Ethernet0/0.receive", expected: true, message: "SW-2: E0/0 で lldp receive が設定されていません" }
+      { device: "SW-2", path: "runningConfig.lldp.interfaces.Ethernet0/0.receive", expected: true, message: "SW-2: E0/0 で lldp receive が設定されていません" },
       { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
       { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" }
     ]
@@ -534,7 +534,7 @@ SW-2(config-if-range)# channel-group 12 mode passive`
       { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.native_vlan", expected: "35", message: "SW-3: E0/0 の native vlan が 35 に設定されていません" },
       { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-3: E0/1 の trunk encapsulation が dot1q ではありません" },
       { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-3: E0/1 が trunk モードではありません" },
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.native_vlan", expected: "35", message: "SW-3: E0/1 の native vlan が 35 に設定されていません" }
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.native_vlan", expected: "35", message: "SW-3: E0/1 の native vlan が 35 に設定されていません" },
       { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
       { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" },
       { device: "SW-3", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-3: 設定が保存されていません (copy run start を実行してください)" }
@@ -576,7 +576,7 @@ SW-2(config-if-range)# channel-group 12 mode passive`
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/1.ospf.processId", expected: "30", message: "R1: E0/1 の OSPFプロセスIDが 30 に設定されていません" },
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/1.ospf.area", expected: "0", message: "R1: E0/1 の OSPFエリアが 0 に設定されていません" },
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/1.ospf.priority", expected: 255, message: "R1: E0/1 の OSPF priority が 255 に設定されていません" },
-      { device: "R1", path: "runningConfig.logs", condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process'), message: "R1: OSPFプロセスのクリアが実行されていません" }
+      { device: "R1", path: "runningConfig.logs", condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process'), message: "R1: OSPFプロセスのクリアが実行されていません" },
       { device: "R1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R1: 設定が保存されていません (copy run start を実行してください)" }
     ]
   }
