@@ -9,7 +9,7 @@
             height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden;
+            overflow: hidden; /* 画面全体のスクロールを禁止 */
         }
         body { 
             font-family: 'Courier New', monospace; 
@@ -33,48 +33,50 @@
             flex-direction: column; 
             border: 1px solid #333; 
             border-radius: 5px; 
+            background-color: #000;
             overflow: hidden; 
             min-height: 0; 
-            cursor: text; /* ターミナル全体にテキストカーソルを表示 */
+            position: relative;
+            cursor: text; /* ターミナル全体をテキストカーソルに */
         }
         
         #terminal { 
             flex: 1; 
-            min-height: 0; 
-            background-color: #000; 
+            padding: 10px; 
             color: #33ff33; 
-            padding: 10px 10px 0 10px; 
-            overflow-y: auto; 
             font-size: 14px; 
+            overflow-y: auto; 
             white-space: pre-wrap; 
+            word-break: break-all;
         }
-        
-        /* ▼ 隠し入力フィールド方式のレイアウト ▼ */
-        .input-area { 
-            display: flex; 
-            align-items: center; /* 縦位置を揃える */
-            flex-wrap: wrap; /* 長いコマンドが打たれたら折り返す */
-            background-color: #000; 
-            padding: 0 10px 10px 5px; 
-            visibility: hidden; 
-            position: relative;
+
+        /* ログの各行 */
+        .log-line {
+            white-space: pre-wrap;
+            line-height: 1.2;
+            margin-bottom: 2px;
+        }
+
+        /* プロンプトと同居する現在入力中の行 */
+        #current-input-line {
+            display: flex;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            line-height: 1.2;
+            margin-top: 2px;
         }
         
         #prompt { 
             color: #33ff33; 
-            padding: 5px 0 5px 5px; 
             font-family: 'Courier New', monospace; 
-            font-size: 14px; 
+            font-weight: bold;
             white-space: pre; 
         }
 
-        /* ユーザーの目に見える文字表示エリア */
         #input-display {
             color: #33ff33;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
             white-space: pre-wrap;
-            word-break: break-all;
         }
 
         /* 実機風の点滅カーソル */
@@ -85,19 +87,18 @@
             background-color: #33ff33;
             animation: blink 1s step-end infinite;
             vertical-align: bottom;
-            margin-bottom: 2px;
-            margin-left: 1px;
         }
         @keyframes blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0; }
         }
 
-        /* 本物の入力枠は完全に隠す（フォーカスだけ受け取る） */
+        /* 本物の入力枠は完全に隠す */
         #command-input { 
             opacity: 0; 
             position: absolute; 
             left: -9999px; 
+            top: 0;
             width: 1px; 
             height: 1px; 
         }
@@ -110,41 +111,38 @@
     </div>
     
     <div class="terminal-container">
-        <div id="terminal"></div>
-        <div class="input-area">
-            <span id="prompt">Router&gt;</span>
-            <span id="input-display"></span><span id="cursor"></span>
-            <input type="text" id="command-input" autofocus="" autocomplete="off" spellcheck="false">
+        <div id="terminal">
+            <div id="current-input-line">
+                <span id="prompt">Router&gt;</span><span id="input-display"></span><span id="cursor"></span>
+            </div>
         </div>
+        <input type="text" id="command-input" autofocus="" autocomplete="off" spellcheck="false">
     </div>
     
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const terminalContainer = document.querySelector('.terminal-container');
             const terminal = document.getElementById('terminal');
             const promptSpan = document.getElementById('prompt');
             const commandInput = document.getElementById('command-input');
             const inputDisplay = document.getElementById('input-display');
             const cursor = document.getElementById('cursor');
-            const inputArea = document.querySelector('.input-area');
+            const currentInputLine = document.getElementById('current-input-line');
             const switchModeBtn = document.getElementById('switch-mode-btn');
             const routerModeBtn = document.getElementById('router-mode-btn');
 
-            // ▼ 実機風の入力同期・フォーカス処理 ▼
+            // --- 入力と表示の同期 ---
             function syncInputDisplay() {
                 inputDisplay.textContent = commandInput.value;
                 terminal.scrollTop = terminal.scrollHeight;
             }
 
-            // ターミナルのどこをクリックしても隠し入力枠にフォーカスさせる
+            // ターミナルのどこをクリックしても入力欄にフォーカス
             document.addEventListener('click', () => {
                 commandInput.focus();
             });
 
-            // 文字が打たれるたびに表示を更新
             commandInput.addEventListener('input', syncInputDisplay);
             
-            // フォーカスが当たっている時だけカーソルを点滅させる
             commandInput.addEventListener('focus', () => {
                 cursor.style.display = 'inline-block';
             });
@@ -152,12 +150,10 @@
                 cursor.style.display = 'none';
             });
 
-            // ターミナルの変化を監視し、常に一番下へ自動スクロール
             const observer = new MutationObserver(() => {
                 terminal.scrollTop = terminal.scrollHeight;
             });
             observer.observe(terminal, { childList: true, subtree: true });
-            // ▲ ここまで ▲
 
             window.onerror = function (message, source, lineno, colno, error) {
                 console.error('エラー:', message, source, lineno); return true;
@@ -214,36 +210,45 @@
 
             let deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
 
+            // ★変更: 入力行(current-input-line)の「直前」にログを追加するように修正
             function appendToTerminal(text) {
                 if (!deviceState.screenLog) deviceState.screenLog = [];
                 deviceState.screenLog.push(text);
                 if (deviceState.screenLog.length > 5000) deviceState.screenLog.shift();
 
                 const div = document.createElement('div');
-                div.style.whiteSpace = 'pre-wrap';
+                div.className = 'log-line';
                 div.textContent = text;
-                terminal.appendChild(div);
-                while (terminal.childNodes.length > 5000) terminal.removeChild(terminal.firstChild);
+                terminal.insertBefore(div, currentInputLine);
+                
+                // 5000行を超えたら古いもの(一番上のlog-line)を消す
+                const lines = terminal.querySelectorAll('.log-line');
+                if (lines.length > 5000) {
+                    terminal.removeChild(lines[0]);
+                }
+            }
+
+            function clearTerminal() { 
+                if (deviceState) deviceState.screenLog = [];
+                // current-input-line 以外の要素(ログ)をすべて削除
+                const lines = terminal.querySelectorAll('.log-line');
+                lines.forEach(line => terminal.removeChild(line));
             }
 
             function renderTerminal() {
-                terminal.innerHTML = '';
+                clearTerminal();
                 if (deviceState.screenLog && deviceState.screenLog.length > 0) {
                     deviceState.screenLog.forEach(text => {
                         const div = document.createElement('div');
-                        div.style.whiteSpace = 'pre-wrap';
+                        div.className = 'log-line';
                         div.textContent = text;
-                        terminal.appendChild(div);
+                        terminal.insertBefore(div, currentInputLine);
                     });
                 } else {
                     appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                     appendToTerminal('Press ENTER to continue...');
                 }
-            }
-
-            function clearTerminal() { 
-                terminal.innerHTML = ''; 
-                if (deviceState) deviceState.screenLog = [];
+                terminal.scrollTop = terminal.scrollHeight;
             }
             
             function initializeEngine() {
@@ -261,7 +266,6 @@
                 renderTerminal();
                 updatePrompt();
                 
-                inputArea.style.visibility = 'visible';
                 commandInput.focus();
             }
 
@@ -1056,7 +1060,7 @@
                             return; 
                         }
                     } else {
-                        appendToTerminal(`${promptSpan.textContent} ${val}`);
+                        appendToTerminal(`${promptSpan.textContent}${val}`);
                     }
                     
                     if (val) { 
