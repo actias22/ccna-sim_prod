@@ -402,17 +402,34 @@
                     }
                 } else if (words.length === 3 && words[0] === 'no' && words[1] === 'logging') {
                     candidates = ['buffered', 'console', 'host', 'on', 'trap', 'userinfo'];
-                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'cdp') {
-                    candidates = ['enable', 'run'];
+                } 
+                // ▼ 修正: no cdp / no lldp もモードで厳密に分ける ▼
+                else if (words.length === 3 && words[0] === 'no' && words[1] === 'cdp') {
+                    if (mode === 'config') candidates = ['run'];
+                    else if (mode.startsWith('interface')) candidates = ['enable'];
                 } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
-                    candidates = ['receive', 'transmit', 'run'];
+                    if (mode === 'config') candidates = ['run'];
+                    else if (mode.startsWith('interface')) candidates = ['receive', 'transmit'];
+                } 
+                // ▼ 修正: no ip / no ipv6 もモードで分ける ▼
+                else if (words.length === 3 && words[0] === 'no' && (words[1] === 'ip' || words[1] === 'ipv6')) {
+                    if (mode === 'config') {
+                        candidates = ['access-list', 'dhcp', 'domain-lookup', 'name-server', 'nat', 'route', 'ssh'];
+                    } else if (mode.startsWith('interface')) {
+                        candidates = ['access-group', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'split-horizon', 'summary-address', 'virtual-reassembly'];
+                    }
                 }
                 else if (words.length === 2 && words[0].startsWith('conf')) {
                     candidates = ['terminal'];
-                } else if (words.length === 2 && words[0] === 'lldp') {
-                    candidates = ['transmit', 'receive', 'run'];
                 } 
-                // ▼ 追加: clear コマンドの候補拡張 ▼
+                // ▼ 修正: cdp / lldp もモードで厳密に分ける ▼
+                else if (words.length === 2 && words[0] === 'lldp') {
+                    if (mode === 'config') candidates = ['run'];
+                    else if (mode.startsWith('interface')) candidates = ['receive', 'transmit'];
+                } else if (words.length === 2 && words[0] === 'cdp') {
+                    if (mode === 'config') candidates = ['run'];
+                    else if (mode.startsWith('interface')) candidates = ['enable'];
+                } 
                 else if (words.length === 2 && words[0] === 'clear') {
                     candidates = ['aaa', 'access-list', 'arp-cache', 'cdp', 'frame-relay', 'ip', 'ipv6', 'line', 'mac-address-table', 'vtp'];
                 } else if (words.length === 3 && words[0] === 'clear' && words[1] === 'ip') {
@@ -435,10 +452,15 @@
                 } else if (words.length === 3 && (words[0] === 'interface' || words[0] === 'int') && words[1] === 'range') {
                     candidates = ['Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
                 } 
-                // ▼ 更新: ip ospf の引数候補をさらに拡張 ▼
+                // ▼ 修正: ip / ipv6 コマンドもモードで分ける ▼
                 else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
-                    candidates = ['access-group', 'access-list', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'route', 'split-horizon', 'ssh', 'summary-address', 'virtual-reassembly'];
-                } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
+                    if (mode === 'config') {
+                        candidates = ['access-list', 'dhcp', 'domain-lookup', 'name-server', 'nat', 'route', 'ssh'];
+                    } else if (mode.startsWith('interface')) {
+                        candidates = ['access-group', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'split-horizon', 'summary-address', 'virtual-reassembly'];
+                    }
+                } 
+                else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
                     candidates = ['extended', 'standard'];
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'ospf') {
                     candidates = ['<1-65535>', 'authentication', 'authentication-key', 'cost', 'dead-interval', 'hello-interval', 'message-digest-key', 'network', 'priority'];
@@ -496,7 +518,6 @@
                 
                 let candidates = getCandidates(words, deviceState.mode);
                 
-                // '<'から始まるプレースホルダー等はTabで補完しないように除外
                 candidates = candidates.filter(c => !c.startsWith('<') && c !== 'A.B.C.D');
 
                 if (candidates.length === 1) {
