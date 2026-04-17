@@ -372,13 +372,13 @@
 
             const physicalPortRegex = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet)/;
 
-            // ▼ 追加・更新: ルーターの全コマンド群を辞書に登録 [cite: 1, 2, 3, 4, 5, 6, 7, 8] ▼
+            // ▼ ルーターとスイッチのコマンドを統合 ▼
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'exit'],
                 'privileged': ['auto', 'clear', 'clock', 'configure', 'connect', 'copy', 'debug', 'delete', 'dir', 'disable', 'disconnect', 'enable', 'erase', 'exit', 'logout', 'mkdir', 'more', 'no', 'ping', 'reload', 'resume', 'rmdir', 'send', 'setup', 'show', 'ssh', 'telnet', 'terminal', 'traceroute', 'undebug', 'vlan', 'write'],
-                'config': ['aaa', 'access-list', 'banner', 'bba-group', 'boot', 'cdp', 'class-map', 'clock', 'config-register', 'crypto', 'default', 'do', 'dot11', 'enable', 'end', 'exit', 'flow', 'hostname', 'interface', 'ip', 'ipv6', 'key', 'line', 'lldp', 'logging', 'login', 'mac-address-table', 'no', 'ntp', 'parameter-map', 'parser', 'policy-map', 'port-channel', 'priority-list', 'privilege', 'queue-list', 'router', 'secure', 'security', 'service', 'snmp-server', 'spanning-tree', 'tacacs-server', 'username', 'vpdn', 'vpdn-group', 'vlan', 'zone', 'zone-pair'],
-                'interface': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mtu', 'no', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'speed', 'standby', 'switchport', 'tx-ring-limit', 'zone-member'],
-                'interface-range': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mtu', 'no', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'speed', 'standby', 'switchport', 'tx-ring-limit', 'zone-member'],
+                'config': ['aaa', 'access-list', 'banner', 'bba-group', 'boot', 'cdp', 'class-map', 'clock', 'config-register', 'crypto', 'default', 'do', 'dot11', 'enable', 'end', 'exit', 'flow', 'hostname', 'interface', 'ip', 'ipv6', 'key', 'line', 'lldp', 'logging', 'login', 'mac', 'mac-address-table', 'mls', 'monitor', 'no', 'ntp', 'parameter-map', 'parser', 'policy-map', 'port-channel', 'priority-list', 'privilege', 'queue-list', 'router', 'sdm', 'secure', 'security', 'service', 'snmp-server', 'spanning-tree', 'tacacs-server', 'username', 'vlan', 'vpdn', 'vpdn-group', 'vtp', 'zone', 'zone-pair'],
+                'interface': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mdix', 'mls', 'mtu', 'no', 'power', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'spanning-tree', 'speed', 'standby', 'storm-control', 'switchport', 'tx-ring-limit', 'zone-member'],
+                'interface-range': ['arp', 'bandwidth', 'cdp', 'channel-group', 'channel-protocol', 'crypto', 'custom-queue-list', 'delay', 'description', 'duplex', 'end', 'exit', 'fair-queue', 'hold-queue', 'ip', 'ipv6', 'lldp', 'mac-address', 'mdix', 'mls', 'mtu', 'no', 'power', 'pppoe', 'pppoe-client', 'priority-group', 'service-policy', 'shutdown', 'spanning-tree', 'speed', 'standby', 'storm-control', 'switchport', 'tx-ring-limit', 'zone-member'],
                 'vlan': ['name', 'exit', 'end', 'no'],
                 'line': ['transport', 'login', 'password', 'exit', 'end', 'no'],
                 'acl': ['permit', 'deny', 'remark', 'no', 'exit', 'end'],
@@ -418,7 +418,6 @@
                 } else if (words.length === 3 && (words[0] === 'interface' || words[0] === 'int') && words[1] === 'range') {
                     candidates = ['Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
                 } 
-                // ▼ 追加・更新: ルーターのIPおよびOSPFパラメータの引数を拡張 [cite: 12, 13] ▼
                 else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
                     candidates = ['access-group', 'access-list', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'route', 'split-horizon', 'ssh', 'summary-address', 'virtual-reassembly'];
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
@@ -426,7 +425,6 @@
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'ospf') {
                     candidates = ['authentication', 'authentication-key', 'cost', 'dead-interval', 'hello-interval', 'message-digest-key', 'network', 'priority'];
                 } 
-                // ▼ 追加・更新: Networkコマンドの引数候補 [cite: 9, 10] ▼
                 else if (words.length === 4 && words[0] === 'network') {
                     candidates = ['area'];
                 }
@@ -434,8 +432,10 @@
                     candidates = ['input'];
                 } else if (words.length === 3 && words[0] === 'transport' && words[1] === 'input') {
                     candidates = ['telnet', 'ssh', 'all', 'none'];
-                } else if (words.length === 2 && words[0] === 'switchport') {
-                    candidates = ['mode', 'access', 'trunk', 'voice', 'port-security'];
+                } 
+                // ▼ スイッチポート・チャネル関連の引数を追加 ▼
+                else if (words.length === 2 && words[0] === 'switchport') {
+                    candidates = ['access', 'mode', 'nonegotiate', 'port-security', 'priority', 'protected', 'trunk', 'voice'];
                 } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'mode') {
                     candidates = ['access', 'trunk'];
                 } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'access') {
@@ -454,6 +454,8 @@
                     candidates = ['mode'];
                 } else if (words.length === 4 && words[0] === 'channel-group' && words[2] === 'mode') {
                     candidates = ['active', 'passive', 'on'];
+                } else if (words.length === 2 && words[0] === 'channel-protocol') {
+                    candidates = ['lacp', 'pagp'];
                 } else if (words.length === 1) {
                     candidates = commandVocabulary[mode] || [];
                 }
