@@ -30,7 +30,7 @@
         <div id="terminal"></div>
         <div class="input-area">
             <span id="prompt">Router&gt;</span>
-            <input type="text" id="command-input" autofocus="" autocomplete="off">
+            <input type="text" id="command-input" autofocus="" autocomplete="off" spellcheck="false">
         </div>
     </div>
     
@@ -249,8 +249,7 @@
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'sh', 'exit'],
                 'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'sh', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase', 'clear'],
-                'config': ['hostname', 'interface', 'ip', 'ipv6', 'username', 'line', 'vlan', 'cdp', 'lldp', 'no', 'exit', 'end', 'ntp', 'router'],
-                // ★ 変更点: 'channel-protocol' というダミーコマンドを追加することで、'channel-' で補完を寸止めさせます
+                'config': ['hostname', 'interface', 'int', 'ip', 'ipv6', 'username', 'line', 'vlan', 'cdp', 'lldp', 'no', 'exit', 'end', 'ntp', 'router'],
                 'interface': ['ip', 'ipv6', 'shutdown', 'shut', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
                 'interface-range': ['ip', 'ipv6', 'shutdown', 'shut', 'no', 'switchport', 'channel-group', 'channel-protocol', 'cdp', 'lldp', 'exit', 'end', 'description'],
                 'vlan': ['name', 'exit', 'end', 'no'],
@@ -259,6 +258,81 @@
                 'router': ['router-id', 'network', 'passive-interface', 'default-information', 'exit', 'end', 'no']
             };
 
+            // -------------------------------------------------------------
+            // ★追加: コマンドと引数の候補を賢く判定する関数
+            // -------------------------------------------------------------
+            function getCandidates(words, mode) {
+                const lastWord = words[words.length - 1] !== undefined ? words[words.length - 1] : '';
+                let candidates = [];
+
+                if (words.length === 2 && words[0].startsWith('conf')) {
+                    candidates = ['terminal'];
+                } else if (words.length === 2 && words[0] === 'lldp') {
+                    candidates = ['transmit', 'receive', 'run'];
+                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
+                    candidates = ['transmit', 'receive', 'run'];
+                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'logging') {
+                    candidates = ['console'];
+                } else if (words.length === 2 && words[0] === 'clear') {
+                    candidates = ['ip'];
+                } else if (words.length === 3 && words[0] === 'clear' && words[1] === 'ip') {
+                    candidates = ['ospf'];
+                } else if (words.length === 4 && words[0] === 'clear' && words[1] === 'ip' && words[2] === 'ospf') {
+                    candidates = ['process'];
+                } else if (words.length === 2 && words[0] === 'router') {
+                    candidates = ['ospf', 'rip', 'eigrp'];
+                } else if (words.length === 2 && (words[0] === 'show' || words[0] === 'sh')) {
+                    candidates = ['ip', 'running-config', 'vlan', 'mac-address-table'];
+                } else if (words.length === 3 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip') {
+                    candidates = ['nat', 'route', 'interface', 'ospf'];
+                } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && words[2] === 'nat') {
+                    candidates = ['translations'];
+                } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && (words[2] === 'interface' || words[2] === 'int')) {
+                    candidates = ['brief'];
+                } else if (words.length === 2 && (words[0] === 'interface' || words[0] === 'int')) {
+                    candidates = ['range', 'Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
+                } else if (words.length === 3 && (words[0] === 'interface' || words[0] === 'int') && words[1] === 'range') {
+                    candidates = ['Ethernet0/0', 'Ethernet0/1', 'Ethernet0/2', 'Ethernet0/3'];
+                } else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
+                    candidates = ['address', 'access-list', 'route', 'nat', 'ssh', 'dhcp', 'ospf', 'helper-address'];
+                } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
+                    candidates = ['extended', 'standard'];
+                } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'ospf') {
+                    candidates = ['priority'];
+                } else if (words.length === 2 && words[0] === 'transport') {
+                    candidates = ['input'];
+                } else if (words.length === 3 && words[0] === 'transport' && words[1] === 'input') {
+                    candidates = ['telnet', 'ssh', 'all', 'none'];
+                } else if (words.length === 2 && words[0] === 'switchport') {
+                    candidates = ['mode', 'access', 'trunk', 'voice', 'port-security'];
+                } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'mode') {
+                    candidates = ['access', 'trunk'];
+                } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'access') {
+                    candidates = ['vlan'];
+                } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'trunk') {
+                    candidates = ['encapsulation', 'allowed', 'native'];
+                } else if (words.length === 4 && words[0] === 'switchport' && words[1] === 'trunk' && words[2] === 'encapsulation') {
+                    candidates = ['dot1q'];
+                } else if (words.length === 4 && words[0] === 'switchport' && words[1] === 'trunk' && words[2] === 'allowed') {
+                    candidates = ['vlan'];
+                } else if (words.length === 4 && words[0] === 'switchport' && words[1] === 'trunk' && words[2] === 'native') {
+                    candidates = ['vlan'];
+                } else if (words.length === 2 && words[0] === 'channel-group') {
+                    candidates = ['1', '12'];
+                } else if (words.length === 3 && words[0] === 'channel-group' && (words[1] === '1' || words[1] === '12')) {
+                    candidates = ['mode'];
+                } else if (words.length === 4 && words[0] === 'channel-group' && words[2] === 'mode') {
+                    candidates = ['active', 'passive', 'on'];
+                } else if (words.length === 1) {
+                    candidates = commandVocabulary[mode] || [];
+                }
+
+                return candidates.filter(cmd => cmd.startsWith(lastWord));
+            }
+
+            // -------------------------------------------------------------
+            // ★修正: Tabキーによる補完ロジック (寸止め対応済み)
+            // -------------------------------------------------------------
             function handleTabCompletion(e) {
                 if (deviceState.awaitingInput) {
                     e.preventDefault();
@@ -267,73 +341,15 @@
                 
                 e.preventDefault();
                 const currentInput = commandInput.value;
-                const mode = deviceState.mode;
                 const words = currentInput.split(' ');
-                const lastWord = words[words.length - 1];
-                if (!lastWord) return;
-
-                let candidates = [];
-
-                if (words.length === 2 && words[0].startsWith('conf')) {
-                    candidates = ['terminal'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && words[0] === 'lldp') {
-                    candidates = ['transmit', 'receive'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
-                    candidates = ['transmit', 'receive'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'no' && words[1] === 'logging') {
-                    candidates = ['console'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && words[0] === 'clear') {
-                    candidates = ['ip'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'clear' && words[1] === 'ip') {
-                    candidates = ['ospf'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 4 && words[0] === 'clear' && words[1] === 'ip' && words[2] === 'ospf') {
-                    candidates = ['process'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && words[0] === 'router') {
-                    candidates = ['ospf', 'rip', 'eigrp'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && (words[0] === 'show' || words[0] === 'sh')) {
-                    candidates = ['ip', 'running-config', 'vlan', 'mac-address-table'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip') {
-                    candidates = ['nat', 'route', 'interface', 'ospf'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && words[2] === 'nat') {
-                    candidates = ['translations'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && (words[2] === 'interface' || words[2] === 'int')) {
-                    candidates = ['brief'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && (words[0] === 'interface' || words[0] === 'int')) {
-                    candidates = ['range'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && (words[0] === 'ip' || words[0] === 'ipv6')) {
-                    candidates = ['address', 'access-list', 'route', 'nat', 'ssh', 'dhcp', 'ospf'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
-                    candidates = ['extended', 'standard'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'ospf') {
-                    candidates = ['priority'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && words[0] === 'transport') {
-                    candidates = ['input'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'transport' && words[1] === 'input') {
-                    candidates = ['telnet', 'ssh', 'all', 'none'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 2 && words[0] === 'switchport') {
-                    candidates = ['mode', 'access', 'trunk', 'voice', 'port-security'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'mode') {
-                    candidates = ['access', 'trunk'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'access') {
-                    candidates = ['vlan'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 3 && words[0] === 'switchport' && words[1] === 'trunk') {
-                    candidates = ['encapsulation', 'allowed', 'native'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 4 && words[0] === 'switchport' && words[1] === 'trunk' && words[2] === 'encapsulation') {
-                    candidates = ['dot1q'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 4 && words[0] === 'switchport' && words[1] === 'trunk' && words[2] === 'allowed') {
-                    candidates = ['vlan'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 4 && words[0] === 'switchport' && words[1] === 'trunk' && words[2] === 'native') {
-                    candidates = ['vlan'].filter(cmd => cmd.startsWith(lastWord));
-                } else if (words.length === 1) {
-                    const vocab = commandVocabulary[mode] || [];
-                    candidates = vocab.filter(cmd => cmd.startsWith(lastWord));
-                }
+                
+                let candidates = getCandidates(words, deviceState.mode);
 
                 if (candidates.length === 1) {
                     words[words.length - 1] = candidates[0];
                     commandInput.value = words.join(' ') + ' ';
                 } else if (candidates.length > 1) {
-                    // ★ 変更点: 候補が複数ある場合、Ciscoの実機と同様に「共通する文字列（プレフィックス）」まで補完して寸止めします。
+                    // 複数候補がある場合は、共通する文字までだけ補完する（Cisco実機仕様）
                     let commonPrefix = candidates[0];
                     for (let i = 1; i < candidates.length; i++) {
                         let j = 0;
@@ -342,13 +358,38 @@
                         }
                         commonPrefix = commonPrefix.substring(0, j);
                     }
-                    // 入力中の文字より長く補完できる共通部分があれば補完する
+                    const lastWord = words[words.length - 1] || '';
                     if (commonPrefix.length > lastWord.length) {
                         words[words.length - 1] = commonPrefix;
-                        // 候補がまだ複数あるので、末尾にスペースは入れずにユーザーの追記を待ちます
                         commandInput.value = words.join(' ');
                     }
                 }
+            }
+
+            // -------------------------------------------------------------
+            // ★新規追加: ?キーによるヘルプ表示ロジック
+            // -------------------------------------------------------------
+            function handleQuestionMark(e) {
+                if (deviceState.awaitingInput) return; // 対話入力中はヘルプを出さない
+                
+                e.preventDefault(); // ?をinput欄に入力させない
+                const currentInput = commandInput.value;
+                const words = currentInput.split(' ');
+                
+                const candidates = getCandidates(words, deviceState.mode);
+                
+                // 入力中のコマンド+? をターミナルに表示（実機挙動）
+                appendToTerminal(`${promptSpan.textContent}${currentInput}?`);
+                
+                if (candidates.length > 0) {
+                    // 候補を一覧表示
+                    candidates.forEach(c => appendToTerminal(`  ${c}`));
+                } else {
+                    appendToTerminal('% Unrecognized command');
+                }
+                
+                // ターミナルを一番下までスクロールさせる
+                terminal.scrollTop = terminal.scrollHeight;
             }
 
             function handleSshCommand(args) {
@@ -865,8 +906,11 @@
                 else if (deviceState.mode === 'line') processLineModeCommand(mainCommand, args);
             }
 
+            // ★追加: イベントリスナーに「?」の処理を統合
             commandInput.addEventListener('keydown', function (e) {
                 if (e.key === 'Tab') { handleTabCompletion(e); return; }
+                if (e.key === '?') { handleQuestionMark(e); return; } // ★ここを追加
+                
                 if (e.key === 'ArrowUp') {
                     e.preventDefault();
                     if (commandHistory.length > 0 && historyIndex > 0) { historyIndex--; commandInput.value = commandHistory[historyIndex]; } 
