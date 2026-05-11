@@ -277,7 +277,7 @@ R2（最後のホストIP）： 2001:db8:12::3/126`
     `,
     tasks: [
       "IEEE 標準フレームタグ付け方式を使用して、ポートEO/0とE0/1 上でSW1 と SW2間のトランクを設定します。<br>またVLAN1,11,12のみが通信出来るように設定します",
-      "vlan12のみを許可するようにSW1の0/2を設定します",
+      "vlan12のみを許可するようにSW1のe0/2を設定します",
       "Sw1とSw2でLACPを設定します。<br>E0/0とEO/1を単一の論理リンクに統合し、トランク構成はそのまま維持します。<br>リンクに番号12を割り当てます。<br>両方のリンクでネゴシエーションを行う必要があります。"
     ],
     // ▼ 練習モード用の解答を追加 ▼
@@ -290,7 +290,7 @@ Sw1,Sw2(config-if-range)#switchport trunk allowed vlan 1,11,12`,
 `Sw1(config)#interface e0/2
 Sw1(config-if)#switchport trunk encapsulation dot1q
 Sw1(config-if)#switchport mode trunk
-Sw1(config-if)#switchport trunk allowed 12`,
+Sw1(config-if)#switchport trunk allowed vlan 12`,
 
 `Sw1,Sw2(config)#interface range e0/0 - 1
 Sw1,Sw2(config-if-range)#channel-group 12 mode active`
