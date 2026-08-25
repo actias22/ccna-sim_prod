@@ -384,6 +384,7 @@
                 return prefix + match[2];
             }
 
+            // ▼ 修正: ハイフンが含まれる場合のパースエラー処理を強化 ▼
             function parseInterfaceRange(rangeStr) {
                 const interfaces = [];
                 const parts = rangeStr.split(',');
@@ -391,13 +392,18 @@
                     part = part.trim();
                     if (part.includes('-')) {
                         const [startStr, endStr] = part.split('-').map(s => s.trim());
-                        const match = normalizeInterfaceName(startStr).match(/^([a-zA-Z-]+[\d\/]+\/)?(\d+)$/);
-                        if (match) {
-                            const prefix = match[1] || '';
+                        const normalizedStart = normalizeInterfaceName(startStr);
+                        // Ethernet等の文字が含まれているかをチェック
+                        const match = normalizedStart.match(/^([a-zA-Z-]+[\d\/]*\/)?(\d+)$/);
+                        if (match && match[1]) {
+                            const prefix = match[1];
                             const startNum = parseInt(match[2]);
                             const endMatch = endStr.match(/\d+$/);
                             const endNum = endMatch ? parseInt(endMatch[0]) : startNum;
                             for (let i = startNum; i <= endNum; i++) interfaces.push(`${prefix}${i}`);
+                        } else {
+                            // プレフィックスがない場合はそのまま入れる（後続のチェックで弾かれる）
+                            interfaces.push(normalizedStart);
                         }
                     } else {
                         interfaces.push(normalizeInterfaceName(part));
@@ -829,6 +835,9 @@
                             if (args.length < 3) { appendToTerminal('% Incomplete command.'); break; }
                             const targets = parseInterfaceRange(args.slice(2).join(' '));
                             
+                            // ▼ 修正: targetsが空（パース失敗・プレフィックスなし）の場合はエラー ▼
+                            if (targets.length === 0) { showInvalidMarker(rawVal, args, 2); break; }
+
                             const invalidFormat = targets.find(t => !validTypesRegex.test(t));
                             if (invalidFormat) { showInvalidMarker(rawVal, args, 2); break; }
 
